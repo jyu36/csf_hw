@@ -100,7 +100,7 @@ void imgproc_ellipse( struct Image *input_img, struct Image *output_img ) {
       int y = j - b;
       //if in ellipse, copy pixel from input to output
       if ((10000 * x * x) / (a * a) + (10000 * y * y) / (b * b) <= 10000) {
-        output_img->data[j * w + x] = input_img->data[j * w + x];
+        output_img->data[j * w + i] = input_img->data[j * w + i];
       }
     }
   }
