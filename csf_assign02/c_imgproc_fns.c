@@ -5,6 +5,16 @@
 #include "imgproc.h"
 
 // TODO: define your helper functions here
+// Clamp function to ensure value stays in between min and max, inclusive
+double clamp (double value, double min, double max) {
+  if (value < min) {
+      return min;
+  } else if (value > max) {
+      return max;
+  } else {
+      return value;
+  }
+}
 
 //! Transform the color component values in each input pixel
 //! by applying the bitwise complement operation. I.e., each bit
@@ -17,6 +27,17 @@
 //!                   transformed pixels should be stored)
 void imgproc_complement( struct Image *input_img, struct Image *output_img ) {
   // TODO: implement
+  int total = input_img->width * input_img->height;
+
+  for (int i = 0; i < total; i++) {
+    uint32_t pixel = input_img->data[i];
+
+    uint32_t alpha = pixel & 0x000000FF; 
+    uint32_t rgb   = pixel & 0xFFFFFF00;
+    uint32_t complemented = (~rgb) & 0xFFFFFF00; // Invert only the RGB bits
+
+    output_img->data[i] = complemented | alpha;
+  }
 }
 
 //! Transform the input image by swapping the row and column
@@ -35,6 +56,15 @@ void imgproc_complement( struct Image *input_img, struct Image *output_img ) {
 //!         width and height are not the same
 int imgproc_transpose( struct Image *input_img, struct Image *output_img ) {
   // TODO: implement
+  if (input_img->width != input_img->height) {
+    return 0;
+  }
+  int n = input_img->width; 
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      output_img->data[j * n + i] = input_img->data[i * n + j];
+    }
+  }
   return 1;
 }
 
@@ -59,6 +89,21 @@ int imgproc_transpose( struct Image *input_img, struct Image *output_img ) {
 //!                   transformed pixels should be stored)
 void imgproc_ellipse( struct Image *input_img, struct Image *output_img ) {
   // TODO: implement
+  int w = input_img->width;
+  int h = input_img->height;
+  int a = w / 2;
+  int b = h / 2;
+
+  for (int i = 0; i < w; i++) {
+    for (int j = 0; j < h; j++) {
+      int x = i - a;
+      int y = j - b;
+      //if in ellipse, copy pixel from input to output
+      if ((10000 * x * x) / (a * a) + (10000 * y * y) / (b * b) <= 10000) {
+        output_img->data[j * w + x] = input_img->data[j * w + x];
+      }
+    }
+  }
 }
 
 //! Transform the input image using an "emboss" effect. The pixels
