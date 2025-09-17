@@ -1,0 +1,8 @@
+/c_imgproc
+/c_imgproc_tests
+/*.o
+/depend.mak
+/asm_imgproc
+/asm_imgproc_tests
+/actual
+/solution.zip
