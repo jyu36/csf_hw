@@ -137,5 +137,40 @@ void imgproc_ellipse( struct Image *input_img, struct Image *output_img ) {
 //! @param output_img pointer to the output Image (in which the
 //!                   transformed pixels should be stored)
 void imgproc_emboss( struct Image *input_img, struct Image *output_img ) {
-  // TODO: implement
+  int w = input_img->width;
+  int h = input_img->height;
+  for (int j = 0; j < h; j++) {
+    for (int i = 0; i < w; i++) {
+      uint32_t p = input_img->data[j * w + i];
+      //extract the rgb and a
+      int r = (p >> 24) & 0xFF;
+      int g = (p >> 16) & 0xFF;
+      int b = (p >> 8)  & 0xFF;
+      uint32_t a = p & 0xFF; 
+      //set the border to grey
+      if (j == 0 || i == 0) {
+        output_img->data[j * w + i] =
+            (128u << 24) | (128u << 16) | (128u << 8) | a;
+        continue;
+      }
+      //calculate the top left neighbor and differnece
+      uint32_t pn = input_img->data[(j - 1) * w + (i - 1)];
+      int dr = (pn >> 24) & 0xFF - r;
+      int dg = (pn >> 16) & 0xFF - g;
+      int db = (pn >> 8)  & 0xFF - b;
+      //handle ties
+      int absr = (dr >= 0) ? dr : -dr;
+      int absg = (dg >= 0) ? dg : -dg;
+      int absb = (db >= 0) ? db : -db;
+      int diff = dr;      
+      int absmax = absr;  
+      if (absg > absmax) { diff = dg; absmax = absg; }
+      if (absb > absmax) { diff = db;  }
+      //clamp if it is too extreme
+      int gray_i = (int)clamp(128.0 + (double)diff, 0.0, 255.0);
+      uint32_t gray = (uint32_t)gray_i;
+      output_img->data[j * w + i] =
+          (gray << 24) | (gray << 16) | (gray << 8) | a;
+    }
+  }
 }
