@@ -87,5 +87,11 @@ void imgproc_ellipse( struct Image *input_img, struct Image *output_img );
 void imgproc_emboss( struct Image *input_img, struct Image *output_img );
 
 // TODO: add prototypes for your helper functions
+//! Clamp a floating-point value to the inclusive range [min, max].
+double clamp(double value, double min, double max);
 
+//! Choose emboss diff between current pixel and its upper-left neighbor.
+//! Pixels are 0xRRGGBBAA. Returns the channel difference (nr-r, ng-g, or nb-b)
+//! with largest absolute value; ties break RED > GREEN > BLUE.
+int emboss_diff(uint32_t cur, uint32_t ul);
 #endif // IMGPROC_H
