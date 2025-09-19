@@ -95,8 +95,11 @@ void test_ellipse_basic( TestObjs *objs );
 void test_emboss_basic( TestObjs *objs );
 // TODO: add prototypes for additional test functions
 
+void test_is_in_ellipse_null_and_edge(TestObjs *objs);
+void test_is_in_ellipse_general(TestObjs *objs);
+void test_is_in_ellipse_square(TestObjs *objs);
+void test_is_in_ellipse_tiny(TestObjs *objs);
 
-void test_is_in_ellipse_basic(TestObjs *objs);
 void test_emboss_diff_tie_red(TestObjs *objs);
 void test_emboss_diff_green_wins(TestObjs *objs);
 void test_emboss_diff_blue_wins(TestObjs *objs);
@@ -122,7 +125,11 @@ int main( int argc, char **argv ) {
   TEST( test_ellipse_basic );
   TEST( test_emboss_basic );
 
-  TEST( test_is_in_ellipse_basic );
+  TEST( test_is_in_ellipse_null_and_edge );
+  TEST( test_is_in_ellipse_general );
+  TEST( test_is_in_ellipse_square );
+  TEST( test_is_in_ellipse_tiny );
+  
   TEST( test_emboss_diff_tie_red );
   TEST( test_emboss_diff_green_wins );
   TEST( test_emboss_diff_blue_wins );
@@ -394,53 +401,67 @@ void test_emboss_basic( TestObjs *objs ) {
 }
 
 //Test helper Functions
+
 //test is_in_ellipse function
-void test_is_in_ellipse_basic(TestObjs *objs) {
-  (void)objs; // unused - we'll create our own test images
-  
-  // Test 1: NULL image and edge cases
+// Test 1: NULL image and edge cases
+void test_is_in_ellipse_null_and_edge(TestObjs *objs) {
+  (void)objs;
+
   ASSERT( !is_in_ellipse(NULL, 0, 0) );
-  
+
   struct Image zero_width_img = {0, 5, NULL};
   ASSERT( !is_in_ellipse(&zero_width_img, 2, 2) );
-  
-  // Test 2: Create a test image for ellipse calculations
+}
+
+// Test 2: General ellipse with width=10, height=6
+void test_is_in_ellipse_general(TestObjs *objs) {
+  (void)objs;
+
   struct Image test_img;
   img_init(&test_img, 10, 6);  // width=10, height=6, center at (3, 5)
-  
+
   // Center point should always be inside
   ASSERT( is_in_ellipse(&test_img, 3, 5) );
-  
+
   // Points clearly inside the ellipse
-  ASSERT( is_in_ellipse(&test_img, 3, 4) );  // one unit left of center
-  ASSERT( is_in_ellipse(&test_img, 2, 5) );  // one unit above center
-  
+  ASSERT( is_in_ellipse(&test_img, 3, 4) );
+  ASSERT( is_in_ellipse(&test_img, 2, 5) );
+
   // Points on ellipse boundary
-  ASSERT( is_in_ellipse(&test_img, 3, 0) );   // left edge
-  ASSERT( is_in_ellipse(&test_img, 0, 5) );   // top edge
-  
+  ASSERT( is_in_ellipse(&test_img, 3, 0) );
+  ASSERT( is_in_ellipse(&test_img, 0, 5) );
+
   // Points clearly outside the ellipse
-  ASSERT( !is_in_ellipse(&test_img, 0, 0) );   // top-left corner
-  ASSERT( !is_in_ellipse(&test_img, 5, 9) );   // bottom-right corner
-  
-  // Test 3: Square image (circular ellipse)
+  ASSERT( !is_in_ellipse(&test_img, 0, 0) );
+  ASSERT( !is_in_ellipse(&test_img, 5, 9) );
+
+  img_cleanup(&test_img);
+}
+
+// Test 3: Square image (circle case)
+void test_is_in_ellipse_square(TestObjs *objs) {
+  (void)objs;
+
   struct Image square_img;
-  img_init(&square_img, 8, 8);  // Creates circle with radius 4, center at (4, 4)
-  
+  img_init(&square_img, 8, 8);  // circle with radius 4, center at (4, 4)
+
   ASSERT( is_in_ellipse(&square_img, 4, 4) );  // center
-  ASSERT( is_in_ellipse(&square_img, 4, 2) );  // inside (distance = 2 < 4)
+  ASSERT( is_in_ellipse(&square_img, 4, 2) );  // inside (distance=2 < 4)
   ASSERT( !is_in_ellipse(&square_img, 0, 0) ); // corner (distance > 4)
-  
-  // Test 4: Very small image
+
+  img_cleanup(&square_img);
+}
+
+// Test 4: Very small image (2x2)
+void test_is_in_ellipse_tiny(TestObjs *objs) {
+  (void)objs;
+
   struct Image tiny_img;
   img_init(&tiny_img, 2, 2);
-  
-  ASSERT( is_in_ellipse(&tiny_img, 0, 0) );   // all points should be inside
-  ASSERT( is_in_ellipse(&tiny_img, 1, 1) );   // for such a small ellipse
-  
-  // Cleanup
-  img_cleanup(&test_img);
-  img_cleanup(&square_img);
+
+  ASSERT( !is_in_ellipse(&tiny_img, 0, 0) );
+  ASSERT( is_in_ellipse(&tiny_img, 1, 1) );
+
   img_cleanup(&tiny_img);
 }
 
