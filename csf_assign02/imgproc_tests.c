@@ -95,11 +95,15 @@ void test_ellipse_basic( TestObjs *objs );
 void test_emboss_basic( TestObjs *objs );
 // TODO: add prototypes for additional test functions
 
-void test_emboss_border_gray_small(TestObjs *objs);
-void test_emboss_tie_red_priority_2x2(TestObjs *objs);
-void test_emboss_clamp_hi_2x2(TestObjs *objs);
-void test_emboss_clamp_lo_2x2(TestObjs *objs);
+
 void test_is_in_ellipse_basic(TestObjs *objs);
+void test_emboss_diff_tie_red(TestObjs *objs);
+void test_emboss_diff_green_wins(TestObjs *objs);
+void test_emboss_diff_blue_wins(TestObjs *objs);
+void test_emboss_diff_zero_and_negative(TestObjs *objs);
+void test_clamp_pass_through(TestObjs *objs);
+void test_clamp_bounds(TestObjs *objs);
+void test_clamp_negatives(TestObjs *objs);
 
 
 int main( int argc, char **argv ) {
@@ -118,13 +122,19 @@ int main( int argc, char **argv ) {
   TEST( test_ellipse_basic );
   TEST( test_emboss_basic );
 
-  TEST( test_emboss_border_gray_small );
-  TEST( test_emboss_tie_red_priority_2x2 );
-  TEST( test_emboss_clamp_hi_2x2 );
-  TEST( test_emboss_clamp_lo_2x2 );
+  TEST( test_is_in_ellipse_basic );
+  TEST( test_emboss_diff_tie_red );
+  TEST( test_emboss_diff_green_wins );
+  TEST( test_emboss_diff_blue_wins );
+  TEST( test_emboss_diff_zero_and_negative );
+  TEST( test_clamp_pass_through );
+  TEST( test_clamp_bounds );
+  TEST( test_clamp_negatives );
+
 
 
   TEST_FINI();
+  
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -383,39 +393,6 @@ void test_emboss_basic( TestObjs *objs ) {
   destroy_img( smiley_emboss_expected );
 }
 
-void test_emboss_border_gray_small(TestObjs *objs) {
-  (void)objs; // unused
-
-  // Input: all identical pixels -> inner diff == 0
-  // Expected: entire image gray 128, alpha preserved
-  struct Picture in_pic = {
-    { { 'p', 0x0A141EAA } },  // R=10,G=20,B=30,A=0xAA
-    3, 3,
-    "ppp"
-    "ppp"
-    "ppp"
-  };
-  struct Picture exp_pic = {
-    { { 'a', 0x808080AA } },  // gray 128, A=0xAA
-    3, 3,
-    "aaa"
-    "aaa"
-    "aaa"
-  };
-
-  struct Image *in  = picture_to_img(&in_pic);
-  struct Image *out = (struct Image *)malloc(sizeof(struct Image));
-  img_init(out, in->width, in->height);
-  struct Image *exp = picture_to_img(&exp_pic);
-
-  imgproc_emboss(in, out);
-  ASSERT( images_equal(out, exp) );
-
-  destroy_img(in);
-  destroy_img(out);
-  destroy_img(exp);
-}
-
 //Test helper Functions
 //test is_in_ellipse function
 void test_is_in_ellipse_basic(TestObjs *objs) {
@@ -467,117 +444,70 @@ void test_is_in_ellipse_basic(TestObjs *objs) {
   img_cleanup(&tiny_img);
 }
 
-void test_emboss_tie_red_priority_2x2(TestObjs *objs) {
-  (void)objs; // unused
-
-  // (1,1) vs (0,0): dr=+50, dg=-50, db=0 => tie on |50| -> prefer RED
-  // gray = 128 + 50 = 178 (0xB2)
-  struct Picture in_pic = {
-    {
-      { 'N', 0x963264AA },  // neighbor at (0,0): (150,50,100,A=AA)
-      { 'X', 0x000000AA },  // border filler
-      { 'Y', 0x000000AA },  // border filler
-      { 'C', 0x646464AA }   // current at (1,1): (100,100,100,A=AA)
-    },
-    2, 2,
-    "NX"
-    "YC"
-  };
-  struct Picture exp_pic = {
-    {
-      { 'a', 0x808080AA },  // border gray 128
-      { 'b', 0xB2B2B2AA }   // 178 gray with A=AA
-    },
-    2, 2,
-    "aa"
-    "ab"
-  };
-
-  struct Image *in  = picture_to_img(&in_pic);
-  struct Image *out = (struct Image *)malloc(sizeof(struct Image));
-  img_init(out, in->width, in->height);
-  struct Image *exp = picture_to_img(&exp_pic);
-
-  imgproc_emboss(in, out);
-  ASSERT( images_equal(out, exp) );
-
-  destroy_img(in);
-  destroy_img(out);
-  destroy_img(exp);
+void test_emboss_diff_tie_red(TestObjs *objs) {
+  (void)objs;
+  // current: (100,100,100), neighbor: (150,50,100)
+  // dr=+50, dg=-50, db=0 → tie on |50| → prefer RED → +50
+  uint32_t cur = (100u<<24) | (100u<<16) | (100u<<8) | 0xAAu; 
+  uint32_t ul  = (150u<<24) | ( 50u<<16) | (100u<<8) | 0xBBu;
+  int diff = emboss_diff(cur, ul);
+  ASSERT(diff == 50);
 }
 
-void test_emboss_clamp_hi_2x2(TestObjs *objs) {
-  (void)objs; // unused
-
-  // dr = +240 -> 128+240 = 368 -> clamp to 255 (0xFF)
-  struct Picture in_pic = {
-    {
-      { 'N', 0xFA0000AA },  // neighbor: (250,0,0,A=AA)
-      { 'X', 0x000000AA },  // border
-      { 'Y', 0x000000AA },  // border
-      { 'C', 0x0A0000AA }   // current: (10,0,0,A=AA)
-    },
-    2, 2,
-    "NX"
-    "YC"
-  };
-  struct Picture exp_pic = {
-    {
-      { 'a', 0x808080AA },  // border gray 128
-      { 'b', 0xFFFFFFAA }   // gray 255 with A=AA
-    },
-    2, 2,
-    "aa"
-    "ab"
-  };
-
-  struct Image *in  = picture_to_img(&in_pic);
-  struct Image *out = (struct Image *)malloc(sizeof(struct Image));
-  img_init(out, in->width, in->height);
-  struct Image *exp = picture_to_img(&exp_pic);
-
-  imgproc_emboss(in, out);
-  ASSERT( images_equal(out, exp) );
-
-  destroy_img(in);
-  destroy_img(out);
-  destroy_img(exp);
+void test_emboss_diff_green_wins(TestObjs *objs) {
+  (void)objs;
+  // current: (120,10,90), neighbor: (110,200,95)
+  // dr=-10, dg=+190, db=+5 → GREEN wins → +190
+  uint32_t cur = (120u<<24) | ( 10u<<16) | ( 90u<<8) | 0x11u;
+  uint32_t ul  = (110u<<24) | (200u<<16) | ( 95u<<8) | 0x22u;
+  int diff = emboss_diff(cur, ul);
+  ASSERT(diff == 190);
 }
 
-void test_emboss_clamp_lo_2x2(TestObjs *objs) {
-  (void)objs; // unused
-
-  // dr = -240 -> 128-240 = -112 -> clamp to 0
-  struct Picture in_pic = {
-    {
-      { 'N', 0x0A0000AA },  // neighbor: (10,0,0,A=AA)
-      { 'X', 0x000000AA },  // border
-      { 'Y', 0x000000AA },  // border
-      { 'C', 0xFA0000AA }   // current: (250,0,0,A=AA)
-    },
-    2, 2,
-    "NX"
-    "YC"
-  };
-  struct Picture exp_pic = {
-    {
-      { 'a', 0x808080AA },  // border gray 128
-      { 'k', 0x000000AA }   // gray 0 with A=AA
-    },
-    2, 2,
-    "aa"
-    "ak"
-  };
-
-  struct Image *in  = picture_to_img(&in_pic);
-  struct Image *out = (struct Image *)malloc(sizeof(struct Image));
-  img_init(out, in->width, in->height);
-  struct Image *exp = picture_to_img(&exp_pic);
-
-  imgproc_emboss(in, out);
-  ASSERT( images_equal(out, exp) );
-
-  destroy_img(in);
-  destroy_img(out);
-  destroy_img(exp);
+void test_emboss_diff_blue_wins(TestObjs *objs) {
+  (void)objs;
+  // current: (50,60,20), neighbor: (55,40,200)
+  // dr=+5, dg=-20, db=+180 → BLUE wins → +180
+  uint32_t cur = ( 50u<<24) | ( 60u<<16) | ( 20u<<8) | 0x33u;
+  uint32_t ul  = ( 55u<<24) | ( 40u<<16) | (200u<<8) | 0x44u;
+  int diff = emboss_diff(cur, ul);
+  ASSERT(diff == 180);
 }
+
+void test_emboss_diff_zero_and_negative(TestObjs *objs) {
+  (void)objs;
+  // identical → dr=dg=db=0 → choose RED → 0
+  uint32_t p = (77u<<24) | (88u<<16) | (99u<<8) | 0x55u;
+  ASSERT(emboss_diff(p, p) == 0);
+
+  // RED strictly largest and negative: (200→100) → -100
+  uint32_t cur = (200u<<24) | (150u<<16) | (140u<<8) | 0xAAu;
+  uint32_t ul  = (100u<<24) | (120u<<16) | (130u<<8) | 0xBBu;
+  ASSERT(emboss_diff(cur, ul) == -100);
+}
+
+void test_clamp_pass_through(TestObjs *objs) {
+  (void)objs;
+  ASSERT(clamp_gray(5)    == 5u);
+  ASSERT(clamp_gray(128)  == 128u);
+  ASSERT(clamp_gray(0)    == 0u);     // exactly min
+  ASSERT(clamp_gray(255)  == 255u);   // exactly max
+}
+
+void test_clamp_bounds(TestObjs *objs) {
+  (void)objs;
+  ASSERT(clamp_gray(-1)    == 0u);    // below min -> 0
+  ASSERT(clamp_gray(256)   == 255u);  // above max -> 255
+  ASSERT(clamp_gray(-100)  == 0u);    // far below -> 0
+  ASSERT(clamp_gray(1000)  == 255u);  // far above -> 255
+}
+
+void test_clamp_negatives(TestObjs *objs) {
+  (void)objs;
+  ASSERT(clamp_gray(-2)   == 0u);     // negative clamps up
+  ASSERT(clamp_gray(1)    == 1u);     // small positive passes through
+  ASSERT(clamp_gray(254)  == 254u);   // near upper bound
+  ASSERT(clamp_gray(256)  == 255u);   // just over upper bound clamps down
+}
+
+
