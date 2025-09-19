@@ -6,7 +6,7 @@
 
 // TODO: define your helper functions here
 // Clamp function to ensure value stays in between min and max, inclusive
-static double clamp (double value, double min, double max) {
+double clamp (double value, double min, double max) {
   if (value < min) {
       return min;
   } else if (value > max) {
@@ -17,7 +17,7 @@ static double clamp (double value, double min, double max) {
 }
 
 // Returns the chosen diff (with ties: red > green > blue)
-static int emboss_diff(uint32_t cur, uint32_t ul) {
+int emboss_diff(uint32_t cur, uint32_t ul) {
   int r  = (int)((cur >> 24) & 0xFF);
   int g  = (int)((cur >> 16) & 0xFF);
   int b  = (int)((cur >>  8) & 0xFF);
