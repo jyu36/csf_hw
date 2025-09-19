@@ -6,7 +6,7 @@
 
 // TODO: define your helper functions here
 // Clamp function to ensure value stays in between min and max, inclusive
-double clamp (double value, double min, double max) {
+static double clamp (double value, double min, double max) {
   if (value < min) {
       return min;
   } else if (value > max) {
@@ -15,6 +15,27 @@ double clamp (double value, double min, double max) {
       return value;
   }
 }
+
+// Returns the chosen diff (with ties: red > green > blue)
+static int emboss_diff(uint32_t cur, uint32_t ul) {
+  int r  = (int)((cur >> 24) & 0xFF);
+  int g  = (int)((cur >> 16) & 0xFF);
+  int b  = (int)((cur >>  8) & 0xFF);
+  int nr = (int)((ul  >> 24) & 0xFF);
+  int ng = (int)((ul  >> 16) & 0xFF);
+  int nb = (int)((ul  >>  8) & 0xFF);
+
+  int dr = nr - r, dg = ng - g, db = nb - b;
+  int absr = dr >= 0 ? dr : -dr;
+  int absg = dg >= 0 ? dg : -dg;
+  int absb = db >= 0 ? db : -db;
+
+  int diff = dr, maxabs = absr;
+  if (absg > maxabs) { diff = dg; maxabs = absg; }
+  if (absb > maxabs) { diff = db; }
+  return diff;
+}
+
 
 //! Transform the color component values in each input pixel
 //! by applying the bitwise complement operation. I.e., each bit
@@ -142,33 +163,23 @@ void imgproc_emboss( struct Image *input_img, struct Image *output_img ) {
   for (int j = 0; j < h; j++) {
     for (int i = 0; i < w; i++) {
       uint32_t p = input_img->data[j * w + i];
-      //extract the rgb and a
-      int r = (p >> 24) & 0xFF;
-      int g = (p >> 16) & 0xFF;
-      int b = (p >> 8)  & 0xFF;
       uint32_t a = p & 0xFF; 
-      //set the border to grey
+
+      //Top row or left column turn grey
       if (j == 0 || i == 0) {
         output_img->data[j * w + i] =
             (128u << 24) | (128u << 16) | (128u << 8) | a;
         continue;
       }
-      //calculate the top left neighbor and differnece
+
+      // Upper-left neighbor and chosen diff
       uint32_t pn = input_img->data[(j - 1) * w + (i - 1)];
-      int dr = (pn >> 24) & 0xFF - r;
-      int dg = (pn >> 16) & 0xFF - g;
-      int db = (pn >> 8)  & 0xFF - b;
-      //handle ties
-      int absr = (dr >= 0) ? dr : -dr;
-      int absg = (dg >= 0) ? dg : -dg;
-      int absb = (db >= 0) ? db : -db;
-      int diff = dr;      
-      int absmax = absr;  
-      if (absg > absmax) { diff = dg; absmax = absg; }
-      if (absb > absmax) { diff = db;  }
-      //clamp if it is too extreme
+      int diff = emboss_diff(p, pn);
+
+      // gray clamp when extreme
       int gray_i = (int)clamp(128.0 + (double)diff, 0.0, 255.0);
       uint32_t gray = (uint32_t)gray_i;
+
       output_img->data[j * w + i] =
           (gray << 24) | (gray << 16) | (gray << 8) | a;
     }
