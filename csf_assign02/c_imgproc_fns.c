@@ -1,22 +1,65 @@
 // C implementations of image processing functions
 
 #include <stdlib.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "imgproc.h"
 
 // TODO: define your helper functions here
-// Clamp function to ensure value stays in between min and max, inclusive
-double clamp (double value, double min, double max) {
-  if (value < min) {
-      return min;
-  } else if (value > max) {
-      return max;
-  } else {
-      return value;
+//! Check if a given pixel lies within an ellipse centered
+//! in the middle of the image. The ellipse has radii equal
+//! to half the width and half the height of the image.
+//!
+//! @param img pointer to the Image struct containing width
+//!            and height information
+//! @param row the row coordinate of the pixel to test
+//! @param col the column coordinate of the pixel to test
+//!
+//! @return true if the pixel lies inside or on the ellipse,
+//!         false otherwise
+bool is_in_ellipse( struct Image *img, int32_t row, int32_t col ) {
+  // Handle edge cases
+  if (img == NULL || img->width == 0 || img->height == 0) {
+    return false;
   }
+  int32_t w = img->width;
+  int32_t h = img->height;
+  int32_t a = w / 2;
+  int32_t b = h / 2;
+  int32_t x = col - a;
+  int32_t y = row - b;
+  return (10000 * x * x) / (a * a) + (10000 * y * y) / (b * b) <= 10000;
 }
 
-// Returns the chosen diff (with ties: red > green > blue)
+//! Clamp an integer value to the valid grayscale range [0, 255].
+//! Any input below 0 will be clamped to 0, and any input above
+//! 255 will be clamped to 255.
+//!
+//! @param value the integer value to clamp
+//!
+//! @return the clamped value as an unsigned 32-bit integer
+uint32_t clamp_gray(int value) {
+    if (value < 0) {
+        return 0;
+    } else if (value > 255) {
+        return 255;
+    } else {
+        return (uint32_t)value;
+    }
+}
+
+//! Compute the emboss difference between two pixels by comparing
+//! their red, green, and blue channels. The difference is taken
+//! as the signed difference from the upper-left (ul) pixel to the
+//! current (cur) pixel, with ties broken in the order:
+//! red > green > blue.
+//!
+//! @param cur the current pixel (ARGB format, with red in the
+//!            highest 8 bits, green in the next 8, and blue in
+//!            the next 8)
+//! @param ul  the upper-left neighbor pixel in the same format
+//!
+//! @return the chosen channel difference (signed integer)
 int emboss_diff(uint32_t cur, uint32_t ul) {
   int r  = (int)((cur >> 24) & 0xFF);
   int g  = (int)((cur >> 16) & 0xFF);
@@ -110,18 +153,11 @@ int imgproc_transpose( struct Image *input_img, struct Image *output_img ) {
 //!                   transformed pixels should be stored)
 void imgproc_ellipse( struct Image *input_img, struct Image *output_img ) {
   // TODO: implement
-  int w = input_img->width;
-  int h = input_img->height;
-  int a = w / 2;
-  int b = h / 2;
-
-  for (int i = 0; i < w; i++) {
-    for (int j = 0; j < h; j++) {
-      int x = i - a;
-      int y = j - b;
+  for (int32_t i = 0; i < input_img->height; i++) {
+    for (int32_t j = 0; j < input_img->width; j++) {
       //if in ellipse, copy pixel from input to output
-      if ((10000 * x * x) / (a * a) + (10000 * y * y) / (b * b) <= 10000) {
-        output_img->data[j * w + i] = input_img->data[j * w + i];
+      if (is_in_ellipse(input_img, i, j)) {
+        output_img->data[i * input_img->width + j] = input_img->data[i * input_img->width + j];
       }
     }
   }
@@ -164,24 +200,18 @@ void imgproc_emboss( struct Image *input_img, struct Image *output_img ) {
     for (int i = 0; i < w; i++) {
       uint32_t p = input_img->data[j * w + i];
       uint32_t a = p & 0xFF; 
-
       //Top row or left column turn grey
       if (j == 0 || i == 0) {
         output_img->data[j * w + i] =
-            (128u << 24) | (128u << 16) | (128u << 8) | a;
+          (128u << 24) | (128u << 16) | (128u << 8) | a;
         continue;
       }
-
       // Upper-left neighbor and chosen diff
       uint32_t pn = input_img->data[(j - 1) * w + (i - 1)];
       int diff = emboss_diff(p, pn);
-
-      // gray clamp when extreme
-      int gray_i = (int)clamp(128.0 + (double)diff, 0.0, 255.0);
-      uint32_t gray = (uint32_t)gray_i;
-
+      uint32_t gray = clamp_gray(128 + diff); // gray clamp when extreme
       output_img->data[j * w + i] =
-          (gray << 24) | (gray << 16) | (gray << 8) | a;
+        (gray << 24) | (gray << 16) | (gray << 8) | a;
     }
   }
 }

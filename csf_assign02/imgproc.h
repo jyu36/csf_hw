@@ -87,11 +87,39 @@ void imgproc_ellipse( struct Image *input_img, struct Image *output_img );
 void imgproc_emboss( struct Image *input_img, struct Image *output_img );
 
 // TODO: add prototypes for your helper functions
-//! Clamp a floating-point value to the inclusive range [min, max].
-double clamp(double value, double min, double max);
+//! Check if a given pixel lies within an ellipse centered
+//! in the middle of the image. The ellipse has radii equal
+//! to half the width and half the height of the image.
+//!
+//! @param img pointer to the Image struct containing width
+//!            and height information
+//! @param row the row coordinate of the pixel to test
+//! @param col the column coordinate of the pixel to test
+//!
+//! @return true if the pixel lies inside or on the ellipse,
+//!         false otherwise
+bool is_in_ellipse( struct Image *img, int32_t row, int32_t col );
 
-//! Choose emboss diff between current pixel and its upper-left neighbor.
-//! Pixels are 0xRRGGBBAA. Returns the channel difference (nr-r, ng-g, or nb-b)
-//! with largest absolute value; ties break RED > GREEN > BLUE.
+//! Clamp an integer value to the valid grayscale range [0, 255].
+//! Any input below 0 will be clamped to 0, and any input above
+//! 255 will be clamped to 255.
+//!
+//! @param value the integer value to clamp
+//!
+//! @return the clamped value as an unsigned 32-bit integer
+uint32_t clamp_gray(int value);
+
+//! Compute the emboss difference between two pixels by comparing
+//! their red, green, and blue channels. The difference is taken
+//! as the signed difference from the upper-left (ul) pixel to the
+//! current (cur) pixel, with ties broken in the order:
+//! red > green > blue.
+//!
+//! @param cur the current pixel (ARGB format, with red in the
+//!            highest 8 bits, green in the next 8, and blue in
+//!            the next 8)
+//! @param ul  the upper-left neighbor pixel in the same format
+//!
+//! @return the chosen channel difference (signed integer)
 int emboss_diff(uint32_t cur, uint32_t ul);
 #endif // IMGPROC_H

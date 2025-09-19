@@ -99,6 +99,7 @@ void test_emboss_border_gray_small(TestObjs *objs);
 void test_emboss_tie_red_priority_2x2(TestObjs *objs);
 void test_emboss_clamp_hi_2x2(TestObjs *objs);
 void test_emboss_clamp_lo_2x2(TestObjs *objs);
+void test_is_in_ellipse_basic(TestObjs *objs);
 
 
 int main( int argc, char **argv ) {
@@ -413,6 +414,57 @@ void test_emboss_border_gray_small(TestObjs *objs) {
   destroy_img(in);
   destroy_img(out);
   destroy_img(exp);
+}
+
+//Test helper Functions
+//test is_in_ellipse function
+void test_is_in_ellipse_basic(TestObjs *objs) {
+  (void)objs; // unused - we'll create our own test images
+  
+  // Test 1: NULL image and edge cases
+  ASSERT( !is_in_ellipse(NULL, 0, 0) );
+  
+  struct Image zero_width_img = {0, 5, NULL};
+  ASSERT( !is_in_ellipse(&zero_width_img, 2, 2) );
+  
+  // Test 2: Create a test image for ellipse calculations
+  struct Image test_img;
+  img_init(&test_img, 10, 6);  // width=10, height=6, center at (3, 5)
+  
+  // Center point should always be inside
+  ASSERT( is_in_ellipse(&test_img, 3, 5) );
+  
+  // Points clearly inside the ellipse
+  ASSERT( is_in_ellipse(&test_img, 3, 4) );  // one unit left of center
+  ASSERT( is_in_ellipse(&test_img, 2, 5) );  // one unit above center
+  
+  // Points on ellipse boundary
+  ASSERT( is_in_ellipse(&test_img, 3, 0) );   // left edge
+  ASSERT( is_in_ellipse(&test_img, 0, 5) );   // top edge
+  
+  // Points clearly outside the ellipse
+  ASSERT( !is_in_ellipse(&test_img, 0, 0) );   // top-left corner
+  ASSERT( !is_in_ellipse(&test_img, 5, 9) );   // bottom-right corner
+  
+  // Test 3: Square image (circular ellipse)
+  struct Image square_img;
+  img_init(&square_img, 8, 8);  // Creates circle with radius 4, center at (4, 4)
+  
+  ASSERT( is_in_ellipse(&square_img, 4, 4) );  // center
+  ASSERT( is_in_ellipse(&square_img, 4, 2) );  // inside (distance = 2 < 4)
+  ASSERT( !is_in_ellipse(&square_img, 0, 0) ); // corner (distance > 4)
+  
+  // Test 4: Very small image
+  struct Image tiny_img;
+  img_init(&tiny_img, 2, 2);
+  
+  ASSERT( is_in_ellipse(&tiny_img, 0, 0) );   // all points should be inside
+  ASSERT( is_in_ellipse(&tiny_img, 1, 1) );   // for such a small ellipse
+  
+  // Cleanup
+  img_cleanup(&test_img);
+  img_cleanup(&square_img);
+  img_cleanup(&tiny_img);
 }
 
 void test_emboss_tie_red_priority_2x2(TestObjs *objs) {
