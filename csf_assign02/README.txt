@@ -3,6 +3,7 @@ Jiaqi Yu
 Lily Ru
 
 TODO: contributions of each team member
+1. MS1: 
 Lily Ru:
 - completed the complement, transpose, and ellipse functions (including associated helper functions)
 - Write and test unit tests for is_in_ellipse

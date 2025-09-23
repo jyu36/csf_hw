@@ -15,6 +15,42 @@
  * them visible to the test code.
  */
 
+# Helper function: is_in_ellipse
+# Parameters: (based on typical ellipse function)
+#   %rdi - x coordinate
+#   %rsi - y coordinate  
+#   %rdx - ellipse center x
+#   %rcx - ellipse center y
+#   %r8 - ellipse width
+#   %r9 - ellipse height
+# Returns: int (0 or 1) in %eax
+	.globl is_in_ellipse
+is_in_ellipse:
+	# TODO: implement ellipse detection logic
+	movl $0, %eax    # placeholder return value
+	ret
+
+# Helper function: emboss_diff
+# Parameters: (based on typical emboss function)
+#   %rdi - pixel1 value
+#   %rsi - pixel2 value
+# Returns: int difference in %eax
+	.globl emboss_diff
+emboss_diff:
+	# TODO: implement emboss difference calculation
+	movl $0, %eax    # placeholder return value
+	ret
+
+# Helper function: clamp_gray
+# Parameters:
+#   %rdi - gray value to clamp
+# Returns: clamped gray value (0-255) in %eax
+	.globl clamp_gray
+clamp_gray:
+	# TODO: implement gray value clamping (0-255)
+	movl %edi, %eax  # placeholder: return input unchanged
+	ret
+
 /*
  * Definitions of image transformation functions
  */
@@ -32,8 +68,60 @@
  *         transformed pixels should be stored)
  */
 	.globl imgproc_complement
+	/*
+	* Register use:
+	*   %r12 - pointer to input Image data array
+	*   %r13 - pointer to output Image data array  
+	*   %r14d - loop index (pixel counter)
+	*   %r15d - total number of pixels (width * height)
+	*   %ebx - current pixel value being processed
+	*   %eax - temporary for width * height calculation
+	*   %edx - extracted alpha component (lower 8 bits)
+	*/
 imgproc_complement:
-	/* TODO: implement */
+	# Prologue: save callee-saved registers
+    pushq %rbx
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+
+	# Compute total = input_img->width * input_img->height
+	movl   0(%rdi), %eax          # eax = width   (32-bit)
+    imull  4(%rdi), %eax          # eax *= height (32-bit)
+    movl   %eax, %r15d            # total -> r15d
+
+	# Load points to data
+	movq   8(%rdi), %r12          # input_img->data (64-bit)
+    movq   8(%rsi), %r13          # output_img->data (64-bit)
+
+	# Initialize loop index = 0
+	movl $0, %r14d 
+
+.Lloop:
+	cmpl %r15d, %r14d
+	jge .Ldone 
+
+	movl   (%r12,%r14,4), %ebx    # load pixel from input (32-bit)
+	movl   %ebx, %edx
+	andl   $0x000000FF, %edx      # alpha
+	andl   $0xFFFFFF00, %ebx      # rgb
+	notl   %ebx
+	andl   $0xFFFFFF00, %ebx      # complemented RGB
+	orl    %edx, %ebx             # combine alpha + RGB
+
+	movl   %ebx, (%r13,%r14,4)    # store pixel to output (32-bit)
+
+	incl   %r14d                  # i++
+	jmp    .Lloop
+
+.Ldone:
+	# Epilogue: restore callee-saved registers
+	popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbx
 	ret
 
 /*
