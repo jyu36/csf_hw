@@ -15,40 +15,19 @@
  * them visible to the test code.
  */
 
-# Helper function: is_in_ellipse
-# Parameters: (based on typical ellipse function)
-#   %rdi - x coordinate
-#   %rsi - y coordinate  
-#   %rdx - ellipse center x
-#   %rcx - ellipse center y
-#   %r8 - ellipse width
-#   %r9 - ellipse height
-# Returns: int (0 or 1) in %eax
 	.globl is_in_ellipse
 is_in_ellipse:
-	# TODO: implement ellipse detection logic
-	movl $0, %eax    # placeholder return value
+	/* TODO: implement */
 	ret
 
-# Helper function: emboss_diff
-# Parameters: (based on typical emboss function)
-#   %rdi - pixel1 value
-#   %rsi - pixel2 value
-# Returns: int difference in %eax
-	.globl emboss_diff
-emboss_diff:
-	# TODO: implement emboss difference calculation
-	movl $0, %eax    # placeholder return value
-	ret
-
-# Helper function: clamp_gray
-# Parameters:
-#   %rdi - gray value to clamp
-# Returns: clamped gray value (0-255) in %eax
 	.globl clamp_gray
 clamp_gray:
-	# TODO: implement gray value clamping (0-255)
-	movl %edi, %eax  # placeholder: return input unchanged
+	/* TODO: implement */
+	ret
+
+	.globl emboss_diff
+emboss_diff:
+	/* TODO: implement */
 	ret
 
 /*
