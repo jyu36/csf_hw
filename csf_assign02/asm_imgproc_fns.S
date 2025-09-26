@@ -119,11 +119,87 @@ imgproc_complement:
  *  @return 1 if the transformation succeeded, or 0 if the
  *          transformation can't be applied because the image
  *          width and height are not the same
+ *
+ *   Register use:
+ *   %rbx  - n = width (=height)
+ *   %r12  - input->data pointer
+ *   %r13  - output->data pointer
+ *   %r14d - loop variable i (row index)
+ *   %r15d - loop variable j (col index)
+ *   %edx  - temporary pixel value
  */
 	.globl imgproc_transpose
 imgproc_transpose:
 	/* TODO: implement */
-	ret
+
+    # Prologue: save callee-saved registers
+    pushq %rbx
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+
+    # Load width and height from input image
+    movl 0(%rdi), %eax        # eax = input width
+    movl 4(%rdi), %ebx        # ebx = input height
+    cmpl %ebx, %eax           # compare width vs height
+    jne .Ltrans_fail          # if not equal then fail
+
+    movl %eax, %ebx           # store n = width in ebx
+
+    # Load pointers to pixel arrays
+    movq 8(%rdi), %r12        # r12 = input data
+    movq 8(%rsi), %r13        # r13 = output data
+
+    # Initialize outer loop: i = 0
+    xorl %r14d, %r14d
+
+.Ltrans_outer_loop:
+    cmpl %ebx, %r14d          # if i >= n, exit outer loop
+    jge .Ltrans_success
+
+    # Initialize inner loop: j = 0
+    xorl %r15d, %r15d
+
+.Ltrans_inner_loop:
+    cmpl %ebx, %r15d          # if j >= n, exit inner loop
+    jge .Ltrans_next_i
+
+    # Compute in_index = i*n + j
+    movl %r14d, %eax          # eax = i
+    imull %ebx, %eax          # eax = i * n
+    addl %r15d, %eax          # eax = i*n + j
+    movl (%r12,%rax,4), %edx  # edx = input->data[in_index]
+
+    # Compute out_index = j*n + i
+    movl %r15d, %ecx          # ecx = j
+    imull %ebx, %ecx          # ecx = j * n
+    addl %r14d, %ecx          # ecx += i
+    movl %edx, (%r13,%rcx,4)  # output->data[out_index] = pixel
+
+    incl %r15d                # j++
+    jmp .Ltrans_inner_loop    # repeat inner loop
+
+.Ltrans_next_i:
+    incl %r14d                # i++
+    jmp .Ltrans_outer_loop    # repeat outer loop
+
+.Ltrans_success:
+    movl $1, %eax             # return 1 (success)
+    jmp .Ltrans_done
+
+.Ltrans_fail:
+    movl $0, %eax             # return 0 (fail)
+
+.Ltrans_done:
+    # Epilogue: restore callee-saved registers
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbx
+    ret
+
 
 /*
  *  Transform the input image by copying only those pixels that are
