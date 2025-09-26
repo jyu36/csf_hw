@@ -78,21 +78,20 @@ imgproc_complement:
 	movl $0, %r14d 
 
 .Lloop:
-	cmpl %r15d, %r14d
+	cmpl %r15d, %r14d			  # if i >= limit, jump to done
 	jge .Ldone 
 
 	movl   (%r12,%r14,4), %ebx    # load pixel from input (32-bit)
 	movl   %ebx, %edx
 	andl   $0x000000FF, %edx      # alpha
 	andl   $0xFFFFFF00, %ebx      # rgb
-	notl   %ebx
-	andl   $0xFFFFFF00, %ebx      # complemented RGB
+	notl   %ebx					  # complement rgb
+	andl   $0xFFFFFF00, %ebx	  # Ensures only the RGB bits are inverted, alpha is still 0 here
 	orl    %edx, %ebx             # combine alpha + RGB
-
 	movl   %ebx, (%r13,%r14,4)    # store pixel to output (32-bit)
 
 	incl   %r14d                  # i++
-	jmp    .Lloop
+	jmp    .Lloop				  # loop again
 
 .Ldone:
 	# Epilogue: restore callee-saved registers

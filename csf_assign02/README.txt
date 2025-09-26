@@ -13,3 +13,8 @@ Jiaqi Yu:
 - Wrote and test unit tests for clamp_gray and emboss_diff
 
 Debug together
+
+2. MS2: 
+Lily Ru: Implemented assembly version of complement function
+Jiaqi Yu: Implemented assembly version of transpose function
+
