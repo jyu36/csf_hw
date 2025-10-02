@@ -125,10 +125,10 @@ int main( int argc, char **argv ) {
   //TEST( test_ellipse_basic );
   //TEST( test_emboss_basic );
 
-  //TEST( test_is_in_ellipse_null_and_edge );
-  //TEST( test_is_in_ellipse_general );
-  //TEST( test_is_in_ellipse_square );
-  //TEST( test_is_in_ellipse_tiny );
+  TEST( test_is_in_ellipse_null_and_edge );
+  TEST( test_is_in_ellipse_general );
+  TEST( test_is_in_ellipse_square );
+  TEST( test_is_in_ellipse_tiny );
   
   //TEST( test_emboss_diff_tie_red );
   //TEST( test_emboss_diff_green_wins );

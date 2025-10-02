@@ -15,10 +15,76 @@
  * them visible to the test code.
  */
 
-	.globl is_in_ellipse
+    .globl is_in_ellipse
 is_in_ellipse:
-	/* TODO: implement */
-	ret
+    /* prologue */
+    pushq %rbp
+    movq  %rsp, %rbp
+    pushq %rbx
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+
+    test  %rdi, %rdi              /* img == NULL? */
+    je    .Lis_in_ellipse_false                 /* If so, jump to .Lfalse */
+
+    movl  (%rdi), %eax            /* eax = width */
+    test  %eax, %eax              /* width == 0? */
+    je    .Lis_in_ellipse_false
+
+    movl  4(%rdi), %r12d          /* r12d = height */
+    test  %r12d, %r12d            /* height == 0? */
+    je    .Lis_in_ellipse_false
+
+    movl  %eax, %r13d             /* r13d = width */
+    sarl  $1, %r13d               /* r13d = a = width / 2 */
+    movl  %r12d, %r14d            /* r14d = height */
+    sarl  $1, %r14d               /* r14d = b = height / 2 */
+
+    movl  %edx, %r15d             /* r15d = col */
+    subl  %r13d, %r15d            /* r15d = col - a (x) */
+    movl  %esi, %ebx              /* ebx = row */
+    subl  %r14d, %ebx             /* ebx = row - b (y) */
+
+    /* term1 = (10000 * x*x) / (a*a) */
+    movslq %r15d, %rax        /* sign-extend x (col - a) */
+    imulq  %rax, %rax         /* rax = x² */
+    imulq  $10000, %rax       /* rax = 10000 * x² */
+    movslq %r13d, %rcx        /* sign-extend a */
+    imulq  %rcx, %rcx         /* rcx = a² */
+    cqto                      /* sign-extend rax into rdx:rax for division */
+    idivq  %rcx               /* rax = (10000 * x²) / a² */
+    movq   %rax, %r15         /* save term1 in r15 */
+
+    /* term2 = (10000 * y*y) / (b*b) */
+    movslq %ebx, %rax         /* sign-extend y (row - b) */
+    imulq  %rax, %rax         /* rax = y² */
+    imulq  $10000, %rax       /* rax = 10000 * y² */
+    movslq %r14d, %rcx        /* sign-extend b */
+    imulq  %rcx, %rcx         /* rcx = b² */
+    cqto                      /* sign-extend rax into rdx:rax for division */
+    idivq  %rcx               /* rax = (10000 * y²) / b² */
+
+    addq   %r15, %rax         /* term1 + term2 */
+    cmpq   $10000, %rax       /* compare sum with 10000 */
+    jg     .Lis_in_ellipse_false             /* if sum > 10000, return 0 */ 
+    movq   $1, %rax            /* else return 1 */
+    jmp    .Lis_in_ellipse_done              /* jump to .Ldone */
+
+.Lis_in_ellipse_false:
+    xorq   %rax, %rax             /* return 0 */
+
+.Lis_in_ellipse_done:
+    /* epilogue */
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbx
+    popq %rbp
+    ret
+
 
 	.globl clamp_gray
 clamp_gray:
