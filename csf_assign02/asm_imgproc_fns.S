@@ -136,7 +136,6 @@ clamp_gray:
     jl .Lclamp_zero         /* if value<0, jump to .Lclamp_zero */
 
     cmpl $255, %eax         /* compare eax, 0*/
-    
 
 	ret
 
