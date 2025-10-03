@@ -16,6 +16,21 @@
  */
 
     .globl is_in_ellipse
+    /*
+     * Register use:
+     *   %rdi  - pointer to input Image structure
+     *   %edx  - x-coordinate (column index, `j`)
+     *   %esi  - y-coordinate (row index, `i`)
+     *   %eax  - temporary storage for width and other calculations
+     *   %r12d - height of the image
+     *   %r13d - a = width / 2 (ellipse horizontal radius)
+     *   %r14d - b = height / 2 (ellipse vertical radius)
+     *   %r15d - x = col - a (horizontal shift for ellipse center)
+     *   %ebx  - y = row - b (vertical shift for ellipse center)
+     *   %rcx  - divisor for terms (e.g., a² or b²)
+     *   %rax  - intermediate results for computations
+     *   %r15  - term1 = (10000 * x²) / a²
+     */
 is_in_ellipse:
     /* Prologue */
     pushq %rbp
@@ -295,6 +310,17 @@ imgproc_transpose:
  *                    transformed pixels should be stored)
  */
     .globl imgproc_ellipse
+    /*
+     * Register use:
+     *   %r8d  - input image width
+     *   %r9d  - input image height
+     *   %r12  - pointer to input image data
+     *   %r13  - pointer to output image data
+     *   %r14d - row index (`i`)
+     *   %r15d - column index (`j`)
+     *   %eax  - calculated pixel index (i * width + j)
+     *   %edx  - pixel value from input image
+     */
 imgproc_ellipse:
     /* Prologue */
     pushq %rbx
