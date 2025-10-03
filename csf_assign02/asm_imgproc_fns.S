@@ -167,78 +167,67 @@ clamp_gray:
  */
 
     .globl emboss_diff
-
+/* %edi = cur (RGBA), %esi = ul (RGBA); return %eax = best (ul - cur) diff */
 emboss_diff:
-    /* ---- Extract cur(R,G,B) ---- */
-    movl   %edi, %eax
-    shrl   $24, %eax             /* cur.R */
-    movl   %eax, %r8d
+    movl   %edi, %eax                      // eax = cur
+    shrl   $24, %eax                       // eax = cur.R
+    movl   %eax, %r8d                      // r8d = cur.R
 
-    movl   %edi, %eax
-    shrl   $16, %eax             /* cur >> 16 */
-    andl   $0xFF, %eax           /* cur.G */
-    movl   %eax, %r9d
+    movl   %edi, %eax                      // eax = cur
+    shrl   $16, %eax                       // eax = cur >> 16
+    andl   $0xFF, %eax                     // eax = cur.G (mask)
+    movl   %eax, %r9d                      // r9d = cur.G
 
-    movl   %edi, %eax
-    shrl   $8,  %eax             /* cur >> 8 */
-    andl   $0xFF, %eax           /* cur.B */
-    movl   %eax, %r10d
+    movl   %edi, %eax                      // eax = cur
+    shrl   $8,  %eax                       // eax = cur >> 8
+    andl   $0xFF, %eax                     // eax = cur.B (mask)
+    movl   %eax, %r10d                     // r10d = cur.B
 
-    /* ---- Extract ul(R,G,B) ---- */
-    movl   %esi, %eax
-    shrl   $24, %eax             /* ul.R */
-    movl   %eax, %r11d
+    movl   %esi, %eax                      // eax = ul
+    shrl   $24, %eax                       // eax = ul.R
+    movl   %eax, %r11d                     // r11d = ul.R (also used for best_abs)
 
-    movl   %esi, %eax
-    shrl   $16, %eax
-    andl   $0xFF, %eax           /* ul.G in eax */
+    movl   %esi, %eax                      // eax = ul
+    shrl   $16, %eax                       // eax = ul >> 16
+    andl   $0xFF, %eax                     // eax = ul.G
 
-    movl   %esi, %ecx
-    shrl   $8,  %ecx
-    andl   $0xFF, %ecx           /* ul.B in ecx */
+    movl   %esi, %ecx                      // ecx = ul
+    shrl   $8,  %ecx                       // ecx = ul >> 8
+    andl   $0xFF, %ecx                     // ecx = ul.B
 
-    /* ---- RED: dr = ul.R - cur.R ---- */
-    movl   %r11d, %edx           /* edx = ul.R */
-    subl   %r8d,  %edx           /* edx = dr */
-    /* best_abs = |dr| in r11d; preserve in r11d so ecx is free for blue later */
-    movl   %edx,  %r11d          /* r11d = dr */
-    movl   %r11d, %r8d
-    sarl   $31,   %r8d           /* r8d = sign mask */
-    xorl   %r8d,  %r11d
-    subl   %r8d,  %r11d          /* r11d = |dr| (best_abs) */
+    movl   %r11d, %edx                     // edx = ul.R
+    subl   %r8d,  %edx                     // edx = dr = ul.R - cur.R
+    movl   %edx,  %r11d                    // r11d = dr
+    movl   %r11d, %r8d                     // r8d = dr (copy)
+    sarl   $31,   %r8d                     // r8d = signmask(dr)
+    xorl   %r8d,  %r11d                    // r11d = dr ^ sign
+    subl   %r8d,  %r11d                    // r11d = |dr| -> best_abs
+                                            // edx currently best diff = dr
 
-    /* ---- GREEN: dg = ul.G - cur.G (ul.G in eax) ---- */
-    subl   %r9d,  %eax           /* eax = dg */
-    /* |dg| -> r9d */
-    movl   %eax,  %r9d           /* r9d = dg */
-    movl   %r9d,  %r8d
-    sarl   $31,   %r8d           /* r8d = sign mask */
-    xorl   %r8d,  %r9d
-    subl   %r8d,  %r9d           /* r9d = |dg| */
-
-    /* if |dg| > best_abs (r11d) -> pick green */
-    cmpl   %r9d, %r11d
-    jge    .L_keep_rg
-    movl   %eax,  %edx           /* best diff = dg */
-    movl   %r9d,  %r11d          /* best_abs  = |dg| */
+    subl   %r9d,  %eax                     // eax = dg = ul.G - cur.G
+    movl   %eax,  %r9d                     // r9d = dg
+    movl   %r9d,  %r8d                     // r8d = dg
+    sarl   $31,   %r8d                     // r8d = signmask(dg)
+    xorl   %r8d,  %r9d                     // r9d = dg ^ sign
+    subl   %r8d,  %r9d                     // r9d = |dg|
+    cmpl   %r9d,  %r11d                    // compare best_abs vs |dg|
+    jge    .L_keep_rg                      // keep red if best_abs >= |dg|
+    movl   %eax,  %edx                     // best diff = dg
+    movl   %r9d,  %r11d                    // best_abs  = |dg|
 .L_keep_rg:
 
-    /* ---- BLUE: db = ul.B - cur.B (ul.B in ecx) ---- */
-    subl   %r10d, %ecx           /* ecx = db */
-    /* |db| -> r10d */
-    movl   %ecx,  %r10d          /* r10d = db */
-    movl   %r10d, %r8d
-    sarl   $31,   %r8d           /* r8d = sign mask */
-    xorl   %r8d,  %r10d
-    subl   %r8d,  %r10d          /* r10d = |db| */
-
-    /* if |db| > best_abs (r11d) -> pick blue */
-    cmpl   %r10d, %r11d
-    jge    .L_done
-    movl   %ecx,  %edx           /* best diff = db */
+    subl   %r10d, %ecx                     // ecx = db = ul.B - cur.B
+    movl   %ecx,  %r10d                    // r10d = db
+    movl   %r10d, %r8d                     // r8d = db
+    sarl   $31,   %r8d                     // r8d = signmask(db)
+    xorl   %r8d,  %r10d                    // r10d = db ^ sign
+    subl   %r8d,  %r10d                    // r10d = |db|
+    cmpl   %r10d, %r11d                    // compare best_abs vs |db|
+    jge    .L_done                         // keep current best if >=
+    movl   %ecx,  %edx                     // best diff = db
 .L_done:
-    movl   %edx, %eax            /* return best diff */
-    ret
+    movl   %edx, %eax                      // return best diff
+    ret                                    // done
     
 /*
  * Definitions of image transformation functions
@@ -556,123 +545,124 @@ imgproc_ellipse:
     .globl imgproc_emboss
 imgproc_emboss:
     /* Prologue */
-    pushq  %rbx
-    pushq  %rbp
-    pushq  %r12
-    pushq  %r13
-    pushq  %r14
-    pushq  %r15
-    subq   $8, %rsp                     /* align stack to 16B before calls */
+    pushq  %rbx                               /* save callee-saved w holder */
+    pushq  %rbp                               /* save callee-saved h holder */
+    pushq  %r12                               /* save in->data */
+    pushq  %r13                               /* save out->data */
+    pushq  %r14                               /* save row index i */
+    pushq  %r15                               /* save col index j */
+    subq   $8, %rsp                           /* align stack to 16B before calls */
 
     /* Load width/height and data pointers */
-    movl   IMAGE_WIDTH_OFFSET(%rdi),  %ebx     /* w */
-    movl   IMAGE_HEIGHT_OFFSET(%rdi), %ebp     /* h */
-    movq   IMAGE_DATA_OFFSET(%rdi),   %r12     /* input->data */
-    movq   IMAGE_DATA_OFFSET(%rsi),   %r13     /* output->data */
+    movl   IMAGE_WIDTH_OFFSET(%rdi),  %ebx    /* ebx = input->width  (w) */
+    movl   IMAGE_HEIGHT_OFFSET(%rdi), %ebp    /* ebp = input->height (h) */
+    movq   IMAGE_DATA_OFFSET(%rdi),   %r12    /* r12 = input->data pointer */
+    movq   IMAGE_DATA_OFFSET(%rsi),   %r13    /* r13 = output->data pointer */
 
-    xorl   %r14d, %r14d                        /* i = 0 */
+    xorl   %r14d, %r14d                       /* i = 0 (row loop init) */
 .Lemb_row:
-    cmpl   %ebp, %r14d
-    jge    .Lemb_done
+    cmpl   %ebp, %r14d                        /* i < h ? */
+    jge    .Lemb_done                         /* if not, all rows done */
 
-    xorl   %r15d, %r15d                        /* j = 0 */
+    xorl   %r15d, %r15d                       /* j = 0 (col loop init) */
 .Lemb_col:
-    cmpl   %ebx, %r15d
-    jge    .Lemb_next_row
+    cmpl   %ebx, %r15d                        /* j < w ? */
+    jge    .Lemb_next_row                     /* if not, advance to next row */
 
     /* idx = i*w + j; cur = in[idx] (use %eax as temp index) */
-    movl   %r14d, %eax
-    imull  %ebx,  %eax                         /* i*w */
-    addl   %r15d, %eax                         /* i*w + j */
-    movl   (%r12,%rax,4), %edx                 /* cur RGBA in edx */
+    movl   %r14d, %eax                        /* eax = i */
+    imull  %ebx,  %eax                        /* eax = i * w */
+    addl   %r15d, %eax                        /* eax = i*w + j (idx) */
+    movl   (%r12,%rax,4), %edx                /* edx = cur pixel RGBA */
 
     /* Edge: top row or left column => RGB=128, keep A */
-    testl  %r14d, %r14d
-    je     .Lemb_edge
-    testl  %r15d, %r15d
-    je     .Lemb_edge
+    testl  %r14d, %r14d                       /* i == 0 ? */
+    je     .Lemb_edge                         /* yes -> edge handling */
+    testl  %r15d, %r15d                       /* j == 0 ? */
+    je     .Lemb_edge                         /* yes -> edge handling */
 
     /* ul_idx = (i-1)*w + (j-1) -> %eax */
-    movl   %r14d, %eax
-    decl   %eax
-    imull  %ebx,  %eax                         /* (i-1)*w */
-    movl   %r15d, %ecx
-    decl   %ecx
-    addl   %ecx,  %eax                         /* (i-1)*w + (j-1) */
+    movl   %r14d, %eax                        /* eax = i */
+    decl   %eax                               /* eax = i - 1 */
+    imull  %ebx,  %eax                        /* eax = (i-1) * w */
+    movl   %r15d, %ecx                        /* ecx = j */
+    decl   %ecx                               /* ecx = j - 1 */
+    addl   %ecx,  %eax                        /* eax = (i-1)*w + (j-1) */
 
     /* diff = emboss_diff(cur, ul) */
-    movl   (%r12,%rax,4), %esi                 /* ul */
-    movl   %edx,        %edi                   /* cur */
-    call   emboss_diff                         /* eax = diff */
+    movl   (%r12,%rax,4), %esi                /* esi = ul pixel (upper-left) */
+    movl   %edx,        %edi                  /* edi = cur pixel */
+    call   emboss_diff                        /* eax = diff (best ul-cur channel) */
 
     /* gray = clamp_gray(128 + diff) */
-    addl   $128, %eax
-    movl   %eax, %edi
-    call   clamp_gray                          /* eax = gray [0..255] */
+    addl   $128, %eax                         /* eax = 128 + diff */
+    movl   %eax, %edi                         /* edi = gray candidate */
+    call   clamp_gray                         /* eax = gray clamped to [0,255] */
 
     /* Recompute idx after calls: idx = i*w + j -> %ecx */
-    movl   %r14d, %ecx
-    imull  %ebx,  %ecx
-    addl   %r15d, %ecx
+    movl   %r14d, %ecx                        /* ecx = i */
+    imull  %ebx,  %ecx                        /* ecx = i * w */
+    addl   %r15d, %ecx                        /* ecx = i*w + j (idx) */
 
     /* A = in[idx] & 0xFF (reload from input) */
-    movl   (%r12,%rcx,4), %edx
-    andl   $0xFF, %edx
+    movl   (%r12,%rcx,4), %edx                /* edx = input[idx] */
+    andl   $0xFF, %edx                        /* edx = alpha (A) component */
 
     /* Compose (gray<<24)|(gray<<16)|(gray<<8)|A into %eax */
-    movzbl %al, %eax                           /* gray 0..255 */
-    shll   $8,  %eax                           /* B */
-    movl   %eax, %r9d
-    shll   $8,  %r9d                           /* G */
-    orl    %r9d, %eax
-    movl   %eax, %r9d
-    shll   $8,  %r9d                           /* R */
-    orl    %r9d, %eax
-    orl    %edx, %eax                          /* +A */
-    movl   %eax, (%r13,%rcx,4)                 /* out[idx] = RGBA */
-    jmp    .Lemb_advance
+    movzbl %al, %eax                          /* zero-extend gray to 32-bit */
+    shll   $8,  %eax                          /* eax = gray << 8 (B position), low 8 = 0 */
+    movl   %eax, %r9d                         /* r9d = (gray << 8) */
+    shll   $8,  %r9d                          /* r9d = gray << 16 (G position) */
+    orl    %r9d, %eax                         /* eax |= G */
+    movl   %eax, %r9d                         /* r9d = B|G */
+    shll   $8,  %r9d                          /* r9d = gray << 24 (R position) */
+    orl    %r9d, %eax                         /* eax |= R (RGB complete) */
+    orl    %edx, %eax                         /* eax |= A (alpha) */
+    movl   %eax, (%r13,%rcx,4)                /* out[idx] = composed RGBA */
+    jmp    .Lemb_advance                      /* go increment j */
 
 .Lemb_edge:
     /* idx = i*w + j -> %ecx (no calls in this block) */
-    movl   %r14d, %ecx
-    imull  %ebx,  %ecx
-    addl   %r15d, %ecx
+    movl   %r14d, %ecx                        /* ecx = i */
+    imull  %ebx,  %ecx                        /* ecx = i * w */
+    addl   %r15d, %ecx                        /* ecx = i*w + j (idx) */
 
     /* A = cur & 0xFF (cur in %edx) */
-    andl   $0xFF, %edx
+    andl   $0xFF, %edx                        /* edx = alpha (A) */
 
     /* gray = 128 */
-    movl   $128, %eax
+    movl   $128, %eax                         /* eax = constant gray 128 */
 
     /* Compose same as above */
-    movzbl %al, %eax
-    shll   $8,  %eax
-    movl   %eax, %r9d
-    shll   $8,  %r9d
-    orl    %r9d, %eax
-    movl   %eax, %r9d
-    shll   $8,  %r9d
-    orl    %r9d, %eax
-    orl    %edx, %eax
-    movl   %eax, (%r13,%rcx,4)
+    movzbl %al, %eax                          /* zero-extend gray */
+    shll   $8,  %eax                          /* shift into B position */
+    movl   %eax, %r9d                         /* r9d = B partial */
+    shll   $8,  %r9d                          /* r9d = G position */
+    orl    %r9d, %eax                         /* add G */
+    movl   %eax, %r9d                         /* r9d = B|G */
+    shll   $8,  %r9d                          /* r9d = R position */
+    orl    %r9d, %eax                         /* add R */
+    orl    %edx, %eax                         /* add A */
+    movl   %eax, (%r13,%rcx,4)                /* out[idx] = RGBA(128,128,128,A) */
 
 .Lemb_advance:
-    incl   %r15d
-    jmp    .Lemb_col
+    incl   %r15d                               /* j++ */
+    jmp    .Lemb_col                           /* continue inner loop */
 
 .Lemb_next_row:
-    incl   %r14d
-    jmp    .Lemb_row
+    incl   %r14d                               /* i++ */
+    jmp    .Lemb_row                           /* continue outer loop */
 
 .Lemb_done:
-    addq   $8, %rsp                     
-    popq   %r15
-    popq   %r14
-    popq   %r13
-    popq   %r12
-    popq   %rbp
-    popq   %rbx
-    ret
+    addq   $8, %rsp                            /* undo 8-byte align shim */
+    popq   %r15                                /* restore j */
+    popq   %r14                                /* restore i */
+    popq   %r13                                /* restore out->data */
+    popq   %r12                                /* restore in->data */
+    popq   %rbp                                /* restore h */
+    popq   %rbx                                /* restore w */
+    ret                                        /* return to caller */
+    
 
 /*
 vim:ft=gas:
