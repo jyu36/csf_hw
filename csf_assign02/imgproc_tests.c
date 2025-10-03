@@ -124,17 +124,17 @@ int main( int argc, char **argv ) {
   TEST( test_complement_basic );
   TEST( test_transpose_basic );
   TEST( test_ellipse_basic );
-  //TEST( test_emboss_basic );
+  TEST( test_emboss_basic );
 
   TEST( test_is_in_ellipse_null_and_edge );
   TEST( test_is_in_ellipse_general );
   TEST( test_is_in_ellipse_square );
   TEST( test_is_in_ellipse_tiny );
   
-  //TEST( test_emboss_diff_tie_red );
-  //TEST( test_emboss_diff_green_wins );
-  //TEST( test_emboss_diff_blue_wins );
-  //TEST( test_emboss_diff_zero_and_negative );
+  TEST( test_emboss_diff_tie_red );
+  TEST( test_emboss_diff_green_wins );
+  TEST( test_emboss_diff_blue_wins );
+  TEST( test_emboss_diff_zero_and_negative );
   TEST( test_clamp_pass_through );
   TEST( test_clamp_bounds );
   TEST( test_clamp_negatives );
