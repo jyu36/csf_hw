@@ -17,7 +17,7 @@
 
     .globl is_in_ellipse
 is_in_ellipse:
-    /* prologue */
+    /* Prologue */
     pushq %rbp
     movq  %rsp, %rbp
     pushq %rbx
@@ -26,57 +26,63 @@ is_in_ellipse:
     pushq %r14
     pushq %r15
 
-    test  %rdi, %rdi              /* img == NULL? */
-    je    .Lis_in_ellipse_false                 /* If so, jump to .Lfalse */
+    test  %rdi, %rdi              /* Check if img == NULL */
+    je    .Lis_in_ellipse_false   /* If so, return false */
 
-    movl  (%rdi), %eax            /* eax = width */
-    test  %eax, %eax              /* width == 0? */
+    movl  (%rdi), %eax            /* eax = width (img->width) */
+    test  %eax, %eax              /* Check if width == 0 */
     je    .Lis_in_ellipse_false
 
-    movl  4(%rdi), %r12d          /* r12d = height */
-    test  %r12d, %r12d            /* height == 0? */
+    movl  4(%rdi), %r12d          /* r12d = height (img->height) */
+    test  %r12d, %r12d            /* Check if height == 0 */
     je    .Lis_in_ellipse_false
 
     movl  %eax, %r13d             /* r13d = width */
-    sarl  $1, %r13d               /* r13d = a = width / 2 */
+    sarl  $1, %r13d               /* r13d = a (width / 2) */
     movl  %r12d, %r14d            /* r14d = height */
-    sarl  $1, %r14d               /* r14d = b = height / 2 */
+    sarl  $1, %r14d               /* r14d = b (height / 2) */
 
-    movl  %edx, %r15d             /* r15d = col */
-    subl  %r13d, %r15d            /* r15d = col - a (x) */
-    movl  %esi, %ebx              /* ebx = row */
-    subl  %r14d, %ebx             /* ebx = row - b (y) */
+    testl %r13d, %r13d            /* Check if a == 0 */
+    je    .Lis_in_ellipse_false
+    testl %r14d, %r14d            /* Check if b == 0 */
+    je    .Lis_in_ellipse_false
+
+    movl  %edx, %r15d             /* r15d = col (j) */
+    subl  %r13d, %r15d            /* r15d = x = col - a */
+    movl  %esi, %ebx              /* ebx = row (i) */
+    subl  %r14d, %ebx             /* ebx = y = row - b */
 
     /* term1 = (10000 * x*x) / (a*a) */
-    movslq %r15d, %rax        /* sign-extend x (col - a) */
-    imulq  %rax, %rax         /* rax = x² */
-    imulq  $10000, %rax       /* rax = 10000 * x² */
-    movslq %r13d, %rcx        /* sign-extend a */
-    imulq  %rcx, %rcx         /* rcx = a² */
-    cqto                      /* sign-extend rax into rdx:rax for division */
-    idivq  %rcx               /* rax = (10000 * x²) / a² */
-    movq   %rax, %r15         /* save term1 in r15 */
+    movslq %r15d, %rax            /* Sign-extend x */
+    imulq  %rax, %rax             /* rax = x² */
+    imulq  $10000, %rax           /* rax = 10000 * x² */
+    movslq %r13d, %rcx            /* Sign-extend a */
+    imulq  %rcx, %rcx             /* rcx = a² */
+    cqto                           /* Sign-extend rax for division */
+    idivq  %rcx                   /* rax = (10000 * x²) / a² */
+    movq   %rax, %r15             /* Save term1 in r15 */
 
     /* term2 = (10000 * y*y) / (b*b) */
-    movslq %ebx, %rax         /* sign-extend y (row - b) */
-    imulq  %rax, %rax         /* rax = y² */
-    imulq  $10000, %rax       /* rax = 10000 * y² */
-    movslq %r14d, %rcx        /* sign-extend b */
-    imulq  %rcx, %rcx         /* rcx = b² */
-    cqto                      /* sign-extend rax into rdx:rax for division */
-    idivq  %rcx               /* rax = (10000 * y²) / b² */
+    movslq %ebx, %rax             /* Sign-extend y */
+    imulq  %rax, %rax             /* rax = y² */
+    imulq  $10000, %rax           /* rax = 10000 * y² */
+    movslq %r14d, %rcx            /* Sign-extend b */
+    imulq  %rcx, %rcx             /* rcx = b² */
+    cqto                           /* Sign-extend rax for division */
+    idivq  %rcx                   /* rax = (10000 * y²) / b² */
 
-    addq   %r15, %rax         /* term1 + term2 */
-    cmpq   $10000, %rax       /* compare sum with 10000 */
-    jg     .Lis_in_ellipse_false             /* if sum > 10000, return 0 */ 
-    movq   $1, %rax            /* else return 1 */
-    jmp    .Lis_in_ellipse_done              /* jump to .Ldone */
+    addq   %r15, %rax             /* term1 + term2 */
+    cmpq   $10000, %rax           /* Compare sum with 10000 */
+    jg     .Lis_in_ellipse_false  /* If sum > 10000, return false */
+
+    movq   $1, %rax               /* Return true */
+    jmp    .Lis_in_ellipse_done
 
 .Lis_in_ellipse_false:
-    xorq   %rax, %rax             /* return 0 */
+    xorq   %rax, %rax             /* Return false (rax = 0) */
 
 .Lis_in_ellipse_done:
-    /* epilogue */
+    /* Epilogue */
     popq %r15
     popq %r14
     popq %r13
@@ -288,10 +294,69 @@ imgproc_transpose:
  *  %rsi - pointer to the output Image (in which the
  *                    transformed pixels should be stored)
  */
-	.globl imgproc_ellipse
+    .globl imgproc_ellipse
 imgproc_ellipse:
-	/* TODO: implement */
-	ret
+    /* Prologue */
+    pushq %rbx
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+
+    /* Load width and height into stable registers */
+    movl 0(%rdi), %r8d        /* r8d = input->width */
+    movl 4(%rdi), %r9d        /* r9d = input->height */
+
+    /* Load pointers to pixel arrays */
+    movq 8(%rdi), %r12        /* r12 = input->data */
+    movq 8(%rsi), %r13        /* r13 = output->data */
+
+    /* Initialize outer loop: i = 0 */
+    xorl %r14d, %r14d         /* r14d = i = 0 */
+
+.Lellipse_outer_loop:
+    cmpl %r9d, %r14d          /* Compare i with height */
+    jge .Lellipse_done        /* If i >= height, exit outer loop */
+
+    /* Initialize inner loop: j = 0 */
+    xorl %r15d, %r15d         /* r15d = j = 0 */
+
+.Lellipse_inner_loop:
+    cmpl %r8d, %r15d          /* Compare j with width */
+    jge .Lellipse_next_i      /* If j >= width, exit inner loop */
+
+    /* Call is_in_ellipse(i, j) */
+    movl %r14d, %esi          /* esi = i (row index) */
+    movl %r15d, %edx          /* edx = j (column index) */
+    call is_in_ellipse
+    testq %rax, %rax          /* Test return value of is_in_ellipse */
+    je .Lellipse_skip_pixel   /* If not in ellipse, skip pixel */
+
+    /* Compute index = i * width + j */
+    movl %r14d, %eax          /* eax = i */
+    imull %r8d, %eax          /* eax = i * width */
+    addl %r15d, %eax          /* eax = i * width + j */
+
+    /* Copy pixel from input to output */
+    movl (%r12,%rax,4), %edx  /* edx = input->data[index] */
+    movl %edx, (%r13,%rax,4)  /* output->data[index] = input->data[index] */
+
+.Lellipse_skip_pixel:
+    incl %r15d                /* j++ */
+    jmp .Lellipse_inner_loop
+
+.Lellipse_next_i:
+    incl %r14d                /* i++ */
+    jmp .Lellipse_outer_loop
+
+.Lellipse_done:
+    /* Epilogue */
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbx
+    ret
 
 /*
  *  Transform the input image using an "emboss" effect. The pixels

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include "tctest.h"
@@ -122,7 +123,7 @@ int main( int argc, char **argv ) {
   // for any additional test functions you add.
   TEST( test_complement_basic );
   TEST( test_transpose_basic );
-  //TEST( test_ellipse_basic );
+  TEST( test_ellipse_basic );
   //TEST( test_emboss_basic );
 
   TEST( test_is_in_ellipse_null_and_edge );
@@ -363,7 +364,6 @@ void test_ellipse_basic( TestObjs *objs ) {
     picture_to_img( &smiley_ellipse_expected_pic );
 
   imgproc_ellipse( objs->smiley, objs->smiley_out );
-
   ASSERT( images_equal( objs->smiley_out, smiley_ellipse_expected ) );
 
   destroy_img( smiley_ellipse_expected );
