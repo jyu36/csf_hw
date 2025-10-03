@@ -541,122 +541,119 @@ imgproc_ellipse:
  *                    transformed pixels should be stored)
 
  * Register use:
- *      %rbx  = width (w)
- *      %rbp  = height (h)
- *      %r12  = input_img->data
- *      %r13  = output_img->data
- *      %r14d = i (row index)
- *      %r15d = j (col index)
- *     %r10d = idx = i*w + j
- *      %edx  = cur pixel (RGBA) / scratch during compose
- *      %ecx  = alpha (A)
- *      %eax  = general scratch / return from emboss_diff, clamp_gray / gray
- *      %edi  = arg: cur for emboss_diff / clamp_gray input value
- *      %esi  = arg: ul  for emboss_diff
+ *   %ebx  = width (w)
+ *   %ebp  = height (h)
+ *   %r12  = input_img->data
+ *   %r13  = output_img->data
+ *   %r14d = i (row index)
+ *   %r15d = j (col index)
+ *   %ecx  = idx = i*w + j   (recomputed after calls)
+ *   %edx  = scratch / alpha (A) during compose
+ *   %eax  = diff / gray / compose accumulator
+ *   %r9d  = compose helper
 
  */
-
     .globl imgproc_emboss
 imgproc_emboss:
-    # Prologue
+    /* Prologue */
     pushq  %rbx
     pushq  %rbp
     pushq  %r12
     pushq  %r13
     pushq  %r14
     pushq  %r15
+    subq   $8, %rsp                     /* align stack to 16B before calls */
 
-    # Load width/height and data pointers
-    movl   IMAGE_WIDTH_OFFSET(%rdi),  %ebx     # w
-    movl   IMAGE_HEIGHT_OFFSET(%rdi), %ebp     # h
-    movq   IMAGE_DATA_OFFSET(%rdi),   %r12     # input->data
-    movq   IMAGE_DATA_OFFSET(%rsi),   %r13     # output->data
+    /* Load width/height and data pointers */
+    movl   IMAGE_WIDTH_OFFSET(%rdi),  %ebx     /* w */
+    movl   IMAGE_HEIGHT_OFFSET(%rdi), %ebp     /* h */
+    movq   IMAGE_DATA_OFFSET(%rdi),   %r12     /* input->data */
+    movq   IMAGE_DATA_OFFSET(%rsi),   %r13     /* output->data */
 
-    xorl   %r14d, %r14d                        # i = 0
+    xorl   %r14d, %r14d                        /* i = 0 */
 .Lemb_row:
     cmpl   %ebp, %r14d
     jge    .Lemb_done
 
-    xorl   %r15d, %r15d                        # j = 0
+    xorl   %r15d, %r15d                        /* j = 0 */
 .Lemb_col:
     cmpl   %ebx, %r15d
     jge    .Lemb_next_row
 
-    # idx = i*w + j
+    /* idx = i*w + j; cur = in[idx] (use %eax as temp index) */
     movl   %r14d, %eax
-    imull  %ebx,  %eax                         # i*w
-    addl   %r15d, %eax                         # i*w + j
-    movl   (%r12,%rax,4), %edx                 # cur pixel RGBA in edx
+    imull  %ebx,  %eax                         /* i*w */
+    addl   %r15d, %eax                         /* i*w + j */
+    movl   (%r12,%rax,4), %edx                 /* cur RGBA in edx */
 
-    # Edge: top row or left column => set RGB=128, keep A
+    /* Edge: top row or left column => RGB=128, keep A */
     testl  %r14d, %r14d
     je     .Lemb_edge
     testl  %r15d, %r15d
     je     .Lemb_edge
 
-    # ul_idx = (i-1)*w + (j-1)
+    /* ul_idx = (i-1)*w + (j-1) -> %eax */
     movl   %r14d, %eax
     decl   %eax
-    imull  %ebx,  %eax                         # (i-1)*w
+    imull  %ebx,  %eax                         /* (i-1)*w */
     movl   %r15d, %ecx
     decl   %ecx
-    addl   %ecx,  %eax                         # (i-1)*w + (j-1)
+    addl   %ecx,  %eax                         /* (i-1)*w + (j-1) */
 
-    # diff = emboss_diff(cur, ul)
-    movl   (%r12,%rax,4), %esi                 # ul
-    movl   %edx,        %edi                   # cur
-    call   emboss_diff                         # eax = diff
+    /* diff = emboss_diff(cur, ul) */
+    movl   (%r12,%rax,4), %esi                 /* ul */
+    movl   %edx,        %edi                   /* cur */
+    call   emboss_diff                         /* eax = diff */
 
-    # gray = clamp_gray(128 + diff)
+    /* gray = clamp_gray(128 + diff) */
     addl   $128, %eax
     movl   %eax, %edi
-    call   clamp_gray                          # eax = gray
+    call   clamp_gray                          /* eax = gray [0..255] */
 
-    # Recompute idx AFTER calls (don't rely on %r10)
-    movl   %r14d, %ecx
-    imull  %ebx,  %ecx                         # i*w
-    addl   %r15d, %ecx                         # i*w + j  -> ecx
-
-    # Reload alpha A from current pixel (input) at idx
-    movl   (%r12,%rcx,4), %edx
-    andl   $0xFF, %edx                         # A in edx (low 8)
-
-    # Compose (gray<<24)|(gray<<16)|(gray<<8)|A  into eax
-    movzbl %al, %eax                           # gray -> eax (zero-extend)
-    shll   $8,  %eax                           # B
-    movl   %eax, %r9d
-    shll   $8,  %r9d                           # G
-    orl    %r9d, %eax
-    movl   %eax, %r9d
-    shll   $8,  %r9d                           # R
-    orl    %r9d, %eax
-    orl    %edx, %eax                          # +A
-
-    movl   %eax, (%r13,%rcx,4)                 # store out[idx]
-    jmp    .Lemb_advance
-
-.Lemb_edge:
-    # Recompute idx (no calls occurred, but keep one code path)
+    /* Recompute idx after calls: idx = i*w + j -> %ecx */
     movl   %r14d, %ecx
     imull  %ebx,  %ecx
     addl   %r15d, %ecx
 
-    # Keep A from cur already in edx; isolate it
-    andl   $0xFF, %edx                         # A
+    /* A = in[idx] & 0xFF (reload from input) */
+    movl   (%r12,%rcx,4), %edx
+    andl   $0xFF, %edx
 
-    movl   $128, %eax                          # gray = 128
+    /* Compose (gray<<24)|(gray<<16)|(gray<<8)|A into %eax */
+    movzbl %al, %eax                           /* gray 0..255 */
+    shll   $8,  %eax                           /* B */
+    movl   %eax, %r9d
+    shll   $8,  %r9d                           /* G */
+    orl    %r9d, %eax
+    movl   %eax, %r9d
+    shll   $8,  %r9d                           /* R */
+    orl    %r9d, %eax
+    orl    %edx, %eax                          /* +A */
+    movl   %eax, (%r13,%rcx,4)                 /* out[idx] = RGBA */
+    jmp    .Lemb_advance
 
-    # Compose same as above
+.Lemb_edge:
+    /* idx = i*w + j -> %ecx (no calls in this block) */
+    movl   %r14d, %ecx
+    imull  %ebx,  %ecx
+    addl   %r15d, %ecx
+
+    /* A = cur & 0xFF (cur in %edx) */
+    andl   $0xFF, %edx
+
+    /* gray = 128 */
+    movl   $128, %eax
+
+    /* Compose same as above */
     movzbl %al, %eax
-    shll   $8,  %eax                           # B
+    shll   $8,  %eax
     movl   %eax, %r9d
-    shll   $8,  %r9d                           # G
+    shll   $8,  %r9d
     orl    %r9d, %eax
     movl   %eax, %r9d
-    shll   $8,  %r9d                           # R
+    shll   $8,  %r9d
     orl    %r9d, %eax
-    orl    %edx, %eax                          # +A
-
+    orl    %edx, %eax
     movl   %eax, (%r13,%rcx,4)
 
 .Lemb_advance:
@@ -668,6 +665,7 @@ imgproc_emboss:
     jmp    .Lemb_row
 
 .Lemb_done:
+    addq   $8, %rsp                     
     popq   %r15
     popq   %r14
     popq   %r13
@@ -675,7 +673,6 @@ imgproc_emboss:
     popq   %rbp
     popq   %rbx
     ret
-
 
 /*
 vim:ft=gas:
