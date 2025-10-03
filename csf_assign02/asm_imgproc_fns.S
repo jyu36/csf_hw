@@ -126,18 +126,34 @@ is_in_ellipse:
  *
  * @param value the integer value to clamp (passed in %esi)
  *
- * @return the clamped value (%rax)
+ * @return the clamped value in the range [0, 255]
  */
-	.globl clamp_gray
+    .globl clamp_gray
 clamp_gray:
-	/* TODO: implement */
-    movl %esi, %eax         /* eax = value */
-    cmpl $0, %eax           /* compare eax, 0 */
-    jl .Lclamp_zero         /* if value<0, jump to .Lclamp_zero */
+    /*
+     * Register use:
+     *   %edi - parameter: value to clamp (32-bit input argument)
+     *   %eax - working register for clamping and return value
+     */
 
-    cmpl $255, %eax         /* compare eax, 0*/
+    movl %edi, %eax          # Copy input argument into %eax
 
-	ret
+    cmpl $0, %eax            # Compare with 0
+    jl .Lclamp_zero          # Jump if value < 0
+
+    cmpl $255, %eax          # Compare with 255
+    jg .Lclamp_255           # Jump if value > 255
+
+    ret                      # Return value already in %eax
+
+.Lclamp_zero:
+    movl $0, %eax
+    ret
+
+.Lclamp_255:
+    movl $255, %eax
+    ret
+
 
 	.globl emboss_diff
 emboss_diff:

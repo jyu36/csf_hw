@@ -135,9 +135,9 @@ int main( int argc, char **argv ) {
   //TEST( test_emboss_diff_green_wins );
   //TEST( test_emboss_diff_blue_wins );
   //TEST( test_emboss_diff_zero_and_negative );
-  //TEST( test_clamp_pass_through );
-  //TEST( test_clamp_bounds );
-  //TEST( test_clamp_negatives );
+  TEST( test_clamp_pass_through );
+  TEST( test_clamp_bounds );
+  TEST( test_clamp_negatives );
 
 
 
