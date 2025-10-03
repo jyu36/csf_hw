@@ -15,6 +15,19 @@
  * them visible to the test code.
  */
 
+/*
+ * Check if a given pixel lies within an ellipse centered
+ * in the middle of the image. The ellipse has radii equal
+ * to half the width and half the height of the image.
+ *
+ * @param img pointer to the Image struct containing width
+ * and height information (passed in %rdi)
+ * @param row the row coordinate of the pixel to test (passed in %esi)
+ * @param col the column coordinate of the pixel to test (passed in %edx)
+ *
+ * @return true (1 in %rax) if the pixel lies inside or on the ellipse,
+ *         false (0 in %rax) otherwise.
+ */
     .globl is_in_ellipse
     /*
      * Register use:
@@ -106,10 +119,25 @@ is_in_ellipse:
     popq %rbp
     ret
 
-
+/*
+ * Clamp an integer value to the valid grayscale range [0, 255].
+ * Any input below 0 will be clamped to 0, and any input above
+ * 255 will be clamped to 255.
+ *
+ * @param value the integer value to clamp (passed in %esi)
+ *
+ * @return the clamped value (%rax)
+ */
 	.globl clamp_gray
 clamp_gray:
 	/* TODO: implement */
+    movl %esi, %eax         /* eax = value */
+    cmpl $0, %eax           /* compare eax, 0 */
+    jl .Lclamp_zero         /* if value<0, jump to .Lclamp_zero */
+
+    cmpl $255, %eax         /* compare eax, 0*/
+    
+
 	ret
 
 	.globl emboss_diff

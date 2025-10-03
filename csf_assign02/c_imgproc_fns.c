@@ -39,13 +39,13 @@ bool is_in_ellipse( struct Image *img, int32_t row, int32_t col ) {
 //!
 //! @return the clamped value as an unsigned 32-bit integer
 uint32_t clamp_gray(int value) {
-    if (value < 0) {
-        return 0;
-    } else if (value > 255) {
-        return 255;
-    } else {
-        return (uint32_t)value;
-    }
+  if (value < 0) {
+    return 0;
+  } else if (value > 255) {
+    return 255;
+  } else {
+    return (uint32_t)value;
+  }
 }
 
 //! Compute the emboss difference between two pixels by comparing
