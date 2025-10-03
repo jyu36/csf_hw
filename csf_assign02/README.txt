@@ -18,3 +18,7 @@ Debug together
 Lily Ru: Implemented assembly version of complement function
 Jiaqi Yu: Implemented assembly version of transpose function
 
+3. MS3:
+Lily Ru: Implemented assembly version of ellipse function and clamp gray helper function
+Jiaqi Yu: Implemented assembly version of emboss function and emboss diff helper function
+
