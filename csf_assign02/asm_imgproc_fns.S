@@ -147,11 +147,11 @@ clamp_gray:
     ret                      # Return value already in %eax
 
 .Lclamp_zero:
-    movl $0, %eax
+    movl $0, %eax            # return 0
     ret
 
 .Lclamp_255:
-    movl $255, %eax
+    movl $255, %eax          # return 255
     ret
 
 
