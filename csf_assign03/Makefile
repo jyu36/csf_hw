@@ -20,7 +20,7 @@ csim : $(OBJS)
 # Target to create a solution.zip file you can upload to Gradescope
 .PHONY: solution.zip
 solution.zip :
-	zip -9r $@ $(FILES_TO_SUBMIT)
+	zip -9r $@ $(FILES_TO_SUBMIT) Makefile
 
 # Generate header file dependencies
 depend :
