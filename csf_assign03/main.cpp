@@ -1,152 +1,126 @@
 #include <iostream>
-#include <string>
+// #include <fstream>
 #include <sstream>
+#include <string>
 #include <cstdint>
 #include <cstdlib>
-#include <vector>
-#include <cmath>
+#include "csim.cpp"  // Include the cache implementation
 
-//helper functions
-
-// Utility function to check if a number is a power of two
-static bool isPowerOfTwo(uint64_t x) {
-  return x && ((x & (x - 1)) == 0);
+void print_usage(const char* prog_name) {
+    std::cerr << "Usage: " << prog_name << " <sets> <blocks> <bytes> <allocate> <write> <evict> <trace>\n";
+    std::cerr << "  <sets>     : Number of sets in the cache (power of 2)\n";
+    std::cerr << "  <blocks>   : Number of blocks per set (power of 2)\n";
+    std::cerr << "  <bytes>    : Number of bytes per block (power of 2, >= 4)\n";
+    std::cerr << "  <allocate> : write-allocate or no-write-allocate\n";
+    std::cerr << "  <write>    : write-through or write-back\n";
+    std::cerr << "  <evict>    : lru or fifo\n";
+    std::cerr << "  <trace>    : Trace file name\n";
 }
 
-// Cache Structures
-struct Block {
-    bool valid = false;
-    uint64_t tag = 0;
-    bool dirty = false;
-};
+bool is_power_of_2(uint32_t n) {
+    return n > 0 && (n & (n - 1)) == 0;
+}
 
-int main(int argc, char** argv) {
+bool validate_parameters(uint32_t sets, uint32_t blocks, uint32_t bytes,
+                         const std::string& allocate, const std::string& write,
+                         const std::string& evict) {
+    if (!is_power_of_2(sets)) {
+        std::cerr << "Error: Number of sets must be a power of 2\n";
+        return false;
+    }
+    if (!is_power_of_2(blocks)) {
+        std::cerr << "Error: Number of blocks per set must be a power of 2\n";
+        return false;
+    }
+    if (!is_power_of_2(bytes) || bytes < 4) {
+        std::cerr << "Error: Block size must be a power of 2 and at least 4\n";
+        return false;
+    }
+    if (allocate != "write-allocate" && allocate != "no-write-allocate") {
+        std::cerr << "Error: Allocate policy must be 'write-allocate' or 'no-write-allocate'\n";
+        return false;
+    }
+    if (write != "write-through" && write != "write-back") {
+        std::cerr << "Error: Write policy must be 'write-through' or 'write-back'\n";
+        return false;
+    }
+    if (evict != "lru" && evict != "fifo") {
+        std::cerr << "Error: Eviction policy must be 'lru' or 'fifo'\n";
+        return false;
+    }
+    // Invalid combination check
+    if (allocate == "no-write-allocate" && write == "write-back") {
+        std::cerr << "Error: no-write-allocate cannot be used with write-back\n";
+        return false;
+    }
+    return true;
+}
+
+int main(int argc, char* argv[]) {
     if (argc != 7) {
         std::cerr << "Usage: " << argv[0] << " <sets> <blocks_per_set> <block_size> <write-allocate|no-write-allocate> <write-through|write-back> <lru|fifo>" << std::endl;
         return 1;
     }
-    
-    int num_sets = std::atoi(argv[1]);
-    int num_blocks_per_set = std::atoi(argv[2]);
-    int block_size = std::atoi(argv[3]);
-    std::string write_alloc = argv[4];
+
+    // Parse command line arguments
+    uint32_t num_sets = std::atoi(argv[1]);
+    uint32_t num_blocks_per_set = std::atoi(argv[2]);
+    uint32_t block_size = std::atoi(argv[3]);
+    std::string allocate_policy = argv[4];
     std::string write_policy = argv[5];
-    std::string eviction = argv[6];
-    
-    //validate arguments
-    if (num_sets <= 0 || num_blocks_per_set <= 0 || block_size <= 0) {
-        std::cerr << "Error: sets, blocks_per_set, and block_size must be positive integers.\n";
-        return 1;
-    }
-    if (!isPowerOfTwo(static_cast<uint64_t>(num_sets)) ||
-        !isPowerOfTwo(static_cast<uint64_t>(num_blocks_per_set)) ||
-        !isPowerOfTwo(static_cast<uint64_t>(block_size))) {
-        std::cerr << "Error: sets, blocks_per_set, and block_size must be powers of two.\n";
-        return 1;
-    }
-    if (block_size < 4) {
-        std::cerr << "Error: block_size must be at least 4 bytes.\n";
-        return 1;
-    }
-    if (write_policy == "write-back" && write_alloc == "no-write-allocate") {
-        std::cerr << "Error: write-back cannot be combined with no-write-allocate.\n";
+    std::string eviction_policy = argv[6];
+    //std::string trace_file = argv[7];
+
+    // Validate parameters
+    if (!validate_parameters(num_sets, num_blocks_per_set, block_size,
+                            allocate_policy, write_policy, eviction_policy)) {
         return 1;
     }
 
-    // Derived params
-    int block_offset_bits = static_cast<int>(std::log2(block_size));
-    int index_bits = (num_sets == 1) ? 0 : static_cast<int>(std::log2(num_sets));
-    uint64_t set_mask = (index_bits == 0) ? 0 : ((1ULL << index_bits) - 1ULL);
-    
-    // Build cache: vector of sets, each set is vector<Block>
-    std::vector< std::vector<Block> > cache(num_sets, std::vector<Block>(num_blocks_per_set));
+    // Convert policy strings to boolean flags
+    bool write_allocate = (allocate_policy == "write-allocate");
+    bool write_through = (write_policy == "write-through");
 
-    // Initialize counters
-    uint64_t total_loads = 0;
-    uint64_t total_stores = 0;
-    uint64_t load_hits = 0;
-    uint64_t load_misses = 0;
-    uint64_t store_hits = 0;
-    uint64_t store_misses = 0;
-    uint64_t cycles = 0;
-    
+    // Create cache
+    Cache cache(num_sets, num_blocks_per_set, block_size,
+                eviction_policy, write_allocate, write_through);
+
+    // Open trace file
+    // std::ifstream trace(trace_file);
+    // if (!trace.is_open()) {
+    //     std::cerr << "Error: Cannot open trace file '" << trace_file << "'\n";
+    //     return 1;
+    // }
+
+    // Process trace file
     std::string line;
-    //Read and Simulate
     while (std::getline(std::cin, line)) {
+        // Skip empty lines 
         if (line.empty()) continue;
 
         std::istringstream iss(line);
-        char op;
-        std::string addr_str;
-        std::string size_str;
+        char operation;
+        std::string address_str;
+        uint32_t ignore;
 
-        uint64_t addr;
-
-        if (iss >> op >> addr_str >> size_str) {
-            // Convert hex string to integer
-            addr = std::stoull(addr_str, nullptr, 16);
-        } else {
-            std::cerr << "Error: Invalid input format.\n";
+        // Parse line
+        if (!(iss >> operation >> address_str >> ignore)) {
+            std::cerr << "Warning: Malformed trace line: " << line << "\n";
             continue;
         }
 
-        // compute set index and tag
-        uint64_t set_index;
-        // Extract set index from address
-        if (index_bits > 0) {
-            set_index = (addr >> block_offset_bits) & set_mask;
-        } else {
-            set_index = 0; // fully associative
-        }
-        // Extract tag from address
-        uint64_t tag = addr >> (block_offset_bits + index_bits);
-        
-        //Access the specific set determined by the address
-        auto &set = cache[static_cast<size_t>(set_index)];
+        // Convert hex address string to uint32_t
+        uint32_t address = std::stoul(address_str, nullptr, 16);
 
-        // Search for matching block in the set
-        int hit_index = -1;
-        for (int i = 0; i < num_blocks_per_set; i++) {
-            if (set[i].valid && set[i].tag == tag) {
-                hit_index = i;
-                break;
-            }
-        }
-
-        // Operation handling
-        if (op == 'l') {
-            total_loads++;
-            if (hit_index != -1) {
-                //implment load hit
-                load_hits++;
-            } else{
-                //implement load miss
-                load_misses++;
-            }
-        } else if (op == 's') {
-            total_stores++; {
-                if (hit_index != -1) {
-                    //implement store hit
-                    store_hits++;
-                } else {
-                    //implement store miss
-                    store_misses++;
-                }
-            }
-        } else {
-            std::cerr << "Error: Invalid operation '" << op << "'. Use 'l' for load and 's' for store.\n";
-            continue;
-        }
+        // Process the access
+        bool is_store = (operation == 's' || operation == 'S');
+        cache.access(address, is_store);
     }
 
-    // Output statistics
-    std::cout << "Total loads: " << total_loads << "\n";
-    std::cout << "Total stores: " << total_stores << "\n";
-    std::cout << "Load hits: " << load_hits << "\n";
-    std::cout << "Load misses: " << load_misses << "\n";
-    std::cout << "Store hits: " << store_hits << "\n";
-    std::cout << "Store misses: " << store_misses << "\n";
-    std::cout << "Total cycles: " << cycles << "\n";
+    //trace.close();
+
+    // Print statistics
+    cache.print_stats();
 
     return 0;
 }
