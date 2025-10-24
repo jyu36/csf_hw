@@ -166,7 +166,7 @@ public:
           const std::string& policy, bool write_alloc, bool write_thru)
         : num_sets(sets), num_blocks_per_set(blocks), block_size(bytes),
           eviction_policy(policy), write_allocate(write_alloc), 
-          write_through(write_thru), timestamp(0) {
+          write_through(write_thru), sets(sets, Set(blocks)), timestamp(0) {
         
         // Calculate bit widths
         offset_bits = log2(block_size);
