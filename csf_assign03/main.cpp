@@ -1,5 +1,4 @@
 #include <iostream>
-// #include <fstream>
 #include <sstream>
 #include <string>
 #include <cstdint>
@@ -14,7 +13,6 @@ void print_usage(const char* prog_name) {
     std::cerr << "  <allocate> : write-allocate or no-write-allocate\n";
     std::cerr << "  <write>    : write-through or write-back\n";
     std::cerr << "  <evict>    : lru or fifo\n";
-    std::cerr << "  <trace>    : Trace file name\n";
 }
 
 bool is_power_of_2(uint32_t n) {
@@ -85,13 +83,6 @@ int main(int argc, char* argv[]) {
     Cache cache(num_sets, num_blocks_per_set, block_size,
                 eviction_policy, write_allocate, write_through);
 
-    // Open trace file
-    // std::ifstream trace(trace_file);
-    // if (!trace.is_open()) {
-    //     std::cerr << "Error: Cannot open trace file '" << trace_file << "'\n";
-    //     return 1;
-    // }
-
     // Process trace file
     std::string line;
     while (std::getline(std::cin, line)) {
@@ -116,8 +107,6 @@ int main(int argc, char* argv[]) {
         bool is_store = (operation == 's' || operation == 'S');
         cache.access(address, is_store);
     }
-
-    //trace.close();
 
     // Print statistics
     cache.print_stats();
