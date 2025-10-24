@@ -67,8 +67,7 @@ int main(int argc, char* argv[]) {
     std::string allocate_policy = argv[4];
     std::string write_policy = argv[5];
     std::string eviction_policy = argv[6];
-    //std::string trace_file = argv[7];
-
+    
     // Validate parameters
     if (!validate_parameters(num_sets, num_blocks_per_set, block_size,
                             allocate_policy, write_policy, eviction_policy)) {
