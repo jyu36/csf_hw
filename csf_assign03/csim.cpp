@@ -1,4 +1,4 @@
-#include <iostream>
+ #include <iostream>
 #include <cstdint>
 #include <vector>
 #include <map>
@@ -34,7 +34,6 @@ struct Stats {
 class Cache {
 private:
     uint32_t num_sets;
-    uint32_t num_blocks_per_set;
     uint32_t block_size;
     std::string eviction_policy;  // FIFO or LRU
     bool write_allocate;
@@ -164,7 +163,7 @@ private:
 public:
     Cache(uint32_t sets, uint32_t blocks, uint32_t bytes, 
           const std::string& policy, bool write_alloc, bool write_thru)
-        : num_sets(sets), num_blocks_per_set(blocks), block_size(bytes),
+        : num_sets(sets), block_size(bytes),
           eviction_policy(policy), write_allocate(write_alloc), 
           write_through(write_thru), sets(sets, Set(blocks)), timestamp(0) {
         
