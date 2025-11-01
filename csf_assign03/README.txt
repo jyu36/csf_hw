@@ -116,14 +116,57 @@ Improvement over 8-way: 12497 - 12463 = 34 fewer misses (0.27% reduction)
 Cycle improvement: 9265186 - 9254420 = 10,766 fewer cycles (0.12% faster)
 
 
+Test 1e: Fully associative (1 set, 1024 blocks, 16 bytes) with LRU and write-back on gcc.trace
+./csim 1 1024 16 write-allocate write-back lru < traces/gcc.trace
+
+Output:
+Total loads: 318197
+Total stores: 197486
+Load hits: 314973
+Load misses: 3224
+Store hits: 188300
+Store misses: 9186
+Total cycles: 9214473
+
+Results:
+Total hits = 314973 + 188300 = 503,273
+Total misses = 3224 + 9186 = 12,410
+Hit rate = 503273 / 515683 × 100% = 97.59%
+Improvement over 16-way: 12463 - 12410 = 53 fewer misses (0.43% reduction)
+Cycle improvement: 9254420 - 9214473 = 39,947 fewer cycles (0.43% faster)
+
+
+Edge Case: Minimal cache (1 set, 1 block, 4 bytes) with LRU and write-back on gcc.trace
+./csim 1 1 4 write-allocate write-back lru < traces/gcc.trace
+
+Output:
+Total loads: 318197
+Total stores: 197486
+Load hits: 13415
+Load misses: 304782
+Store hits: 13556
+Store misses: 183930
+Total cycles: 68284271
+
+Results:
+Total hits = 13415 + 13556 = 26,971
+Total misses = 304782 + 183930 = 488,712
+Hit rate = 26971 / 515683 × 100% = 5.23%
+This minimal 4-byte cache can only hold one memory location and performs extremely poorly, demonstrating the importance of adequate cache capacity.
+
+
 
 Conclusion from Experiment 1:
 
 Increasing associativity from 1 way direct-mapped to 4-way reduced misses by 20.7% and execution time by 16.2%. This large improvement occurs because direct-mapped caches suffer from conflict misses when multiple frequently-accessed addresses map to the same cache line.
 However, moving from 4-way to 8-way only reduces misses by 1.1% and going to 16-way reduced by 0.27%. 
+Even going to fully associative (1024-way) only improved by an additional 0.43% over 16-way, showing extreme diminishing returns.
 At these higher associativities, most conflict misses have already been eliminated, so additional ways don't help much.
+
+The edge case of a minimal cache (1 set, 1 block, 4 bytes) shows only 5.23% hit rate with 488,712 misses, demonstrating that without adequate capacity and associativity, a cache is nearly useless.
+
 The 4-way configuration captures most of the performance benefit while keeping hardware complexity reasonable. 
-Higher associativity requires more comparators for parallel tag matching and more complex LRU tracking logic, making the marginal 1-2% improvement not worth the added cost and power consumption.
+Higher associativity requires more comparators for parallel tag matching and more complex LRU tracking logic, making the marginal improvements not worth the added cost and power consumption.
 
 
 
@@ -133,6 +176,25 @@ Experiment 2: Testing Block Size
 
 Goal: Find optimal block size considering miss rate vs miss penalty trade-off.
 Why: Larger blocks exploit spatial locality and reduce misses but increase miss penalty because each miss transfers more data. So we should find out which one dominates the effect
+
+
+Edge Case: 4-byte blocks (1024 sets, 4 blocks, 4 bytes) with LRU and write-back on gcc.trace
+./csim 1024 4 4 write-allocate write-back lru < traces/gcc.trace
+
+Output:
+Total loads: 318197
+Total stores: 197486
+Load hits: 312620
+Load misses: 5577
+Store hits: 169672
+Store misses: 27814
+Total cycles: 6415192
+
+Results:
+Total misses = 5577 + 27814 = 33,391
+Hit rate = (312620 + 169672) / 515683 × 100% = 93.52%
+Miss penalty per block = 100 × (4/4) = 100 cycles (minimal penalty)
+Total cycles: 6.4M (FASTEST despite more misses because penalty is so low)
 
 
 Test 2a: 16-byte blocks (256 sets, 4 blocks, 16 bytes) with LRU and write-back on gcc.trace
@@ -195,16 +257,18 @@ Total cycles: 13.0M vs 9.3M = 3.7M MORE cycles (39.8% SLOWER)
 
 
 Conclusion from Experiment 2:
-As block size increases, cache misses decrease from 12,635 misses (16-byte) to 7,357 misses (32-byte) to 4,705 misses (64-byte).
+As block size increases, cache misses decrease from 33,391 misses (4-byte) to 12,635 misses (16-byte) to 7,357 misses (32-byte) to 4,705 misses (64-byte).
 
 However, larger blocks have significantly higher miss penalties because each miss must transfer the entire block from memory at 100 cycles per 4-byte word:
+- 4-byte: 100 cycles per miss
 - 16-byte: 400 cycles per miss
 - 32-byte: 800 cycles per miss 
 - 64-byte: 1,600 cycles per miss 
 
-The penalty increase outweighs the miss reduction. Despite 32-byte blocks reducing misses by 41.8%, execution time increases by 13.7%. Similarly, 64-byte blocks cut misses by 62.7% but run 39.8% slower.
+Interestingly, the edge case of 4-byte blocks achieved the fastest execution time (6.4M cycles) despite having the most misses (33,391), because the minimal miss penalty (100 cycles) more than compensates for the poor hit rate. However, 4-byte blocks are impractical because they don't exploit any spatial locality and would require cache line size to match memory bus width.
 
-16-byte blocks are optimal because they minimize total execution time. The smaller miss penalty more than compensates for the higher miss rate.
+For practical designs, 16-byte blocks provide the best balance. They achieve 97.55% hit rate and 9.3M cycles. Larger blocks like 32-byte and 64-byte reduce misses by 41.8% and 62.7% respectively, but their higher penalties make them 13.7% and 39.8% slower.
+
 This suggests gcc.trace has moderate spatial locality where not all data in larger blocks gets used before eviction and wasting memory bandwidth.
 
 
