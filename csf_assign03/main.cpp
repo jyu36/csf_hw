@@ -3,7 +3,7 @@
 #include <string>
 #include <cstdint>
 #include <cstdlib>
-#include "csim.cpp"  // Include the cache implementation
+#include "csim.h"
 
 void print_usage(const char* prog_name) {
     std::cerr << "Usage: " << prog_name << " <sets> <blocks> <bytes> <allocate> <write> <evict> <trace>\n";

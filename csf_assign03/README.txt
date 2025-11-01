@@ -17,9 +17,6 @@ Jiaqi Yu: Run comprehensive experiments and collect performance data
 Lily Ru: Analyze experimental results and write final report
 
 
-
-
-
 Part B: Best Cache Configuration
 
 
