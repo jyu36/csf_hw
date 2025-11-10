@@ -221,7 +221,8 @@ Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, un
     return child;
 }
 
-// Function to wait for a child process and check its exit status
+// Waits for a child process (created by quicksort_subproc) to complete,
+// verifies its exit status, and updates the child's success and waited flags.
 void quicksort_wait(Child *child) {
     if (!child->valid || child->waited)
         return;
@@ -241,19 +242,14 @@ void quicksort_wait(Child *child) {
     child->waited = 1;
 }
 
-// Function to check if a child process completed successfully
-// int quicksort_check_success(Child *child) {
-//     if (!child->valid)
-//         return 0;
-//     return child->success;
-// }
-
+//Create Child Process to do recursive sortingif size > threshold
 static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
     unsigned long mid = partition(arr, start, end);
     unsigned long size_left = mid - start;
     unsigned long size_right = end - mid - 1;
-    
+    //Initialize Child Structures
     Child left, right;
+    //Left Partition
     if (size_left > par_threshold)
         left = quicksort_subproc(arr, start, mid, par_threshold);
     else {
@@ -261,6 +257,7 @@ static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long e
         left.success = quicksort(arr, start, mid, par_threshold);
         left.waited = 1;
     }
+    //Right Partition
     if (size_right > par_threshold)
         right = quicksort_subproc(arr, mid + 1, end, par_threshold);
     else {
@@ -268,7 +265,9 @@ static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long e
         right.success = quicksort(arr, mid + 1, end, par_threshold);
         right.waited = 1;
     }
+    // Wait for both child processes to finish and verify success.
     quicksort_wait(&left);
     quicksort_wait(&right);
+    // Return 1 only if both left and right sides sorted successfully.
     return (&left)->success && (&right)->success;
 }
