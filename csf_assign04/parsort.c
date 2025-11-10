@@ -188,14 +188,17 @@ unsigned long partition( int64_t *arr, unsigned long start, unsigned long end ) 
 int quicksort(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
     assert(end >= start);
     unsigned long len = end - start;
+
     // Base case: fewer than 2 elements
     if (len < 2)
         return 1;
+
     // Sequential sort if below threshold
     if (len <= par_threshold) {
         qsort(arr + start, len, sizeof(int64_t), compare);
         return 1;
     }
+
     // Recursive parallel sort
     return quicksort_parallel(arr, start, end, par_threshold);
 }
