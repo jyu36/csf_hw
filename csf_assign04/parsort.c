@@ -15,6 +15,19 @@ int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned lo
 
 // TODO: declare additional helper functions if needed
 
+// Structure to keep track of child process information
+typedef struct {
+    pid_t pid;        // process ID of the child (if created)
+    int waited;       // whether waitpid() has been called
+    int success;      // whether the child completed successfully
+    int valid;        // whether a child was successfully created
+} Child;
+
+Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold);
+void quicksort_wait(Child *child);
+int quicksort_check_success(Child *child);
+static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold);
+
 int main( int argc, char **argv ) {
   unsigned long par_threshold;
   if ( argc != 3 || sscanf( argv[2], "%lu", &par_threshold ) != 1 ) {
@@ -172,32 +185,90 @@ unsigned long partition( int64_t *arr, unsigned long start, unsigned long end ) 
 //
 // Return:
 //   1 if the sort was successful, 0 otherwise
-int quicksort( int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold ) {
-  assert( end >= start );
-  unsigned long len = end - start;
-
-  // Base case: if there are fewer than 2 elements to sort,
-  // do nothing
-  if ( len < 2 )
-    return 1;
-
-  // Base case: if number of elements is less than or equal to
-  // the threshold, sort sequentially using qsort
-  if ( len <= par_threshold ) {
-    qsort( arr + start, len, sizeof(int64_t), compare );
-    return 1;
-  }
-
-  // Partition
-  unsigned long mid = partition( arr, start, end );
-
-  // Recursively sort the left and right partitions
-  int left_success, right_success;
-  // TODO: modify this code so that the recursive calls execute in child processes
-  left_success = quicksort( arr, start, mid, par_threshold );
-  right_success = quicksort( arr, mid + 1, end, par_threshold );
-
-  return left_success && right_success;
+int quicksort(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
+    assert(end >= start);
+    unsigned long len = end - start;
+    // Base case: fewer than 2 elements
+    if (len < 2)
+        return 1;
+    // Sequential sort if below threshold
+    if (len <= par_threshold) {
+        qsort(arr + start, len, sizeof(int64_t), compare);
+        return 1;
+    }
+    // Recursive parallel sort
+    return quicksort_parallel(arr, start, end, par_threshold);
 }
 
 // TODO: define additional helper functions if needed
+
+// Function to create a child process to perform quicksort on a subarray
+Child quicksort_subproc(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
+    Child child = { .pid = -1, .waited = 0, .success = 0, .valid = 0 };
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork failed");
+        return child; // invalid child
+    }
+    if (pid == 0) {
+        // Child process — perform recursive sort
+        int success = quicksort(arr, start, end, par_threshold);
+        exit(success ? 0 : 1);
+    }
+    // Parent process — store child info
+    child.pid = pid;
+    child.valid = 1;
+    return child;
+}
+
+// Function to wait for a child process and check its exit status
+void quicksort_wait(Child *child) {
+    if (!child->valid || child->waited)
+        return;
+    int wstatus;
+    if (waitpid(child->pid, &wstatus, 0) < 0) {
+        perror("waitpid failed");
+        child->success = 0;
+    } else if (!WIFEXITED(wstatus)) {
+        fprintf(stderr, "Child %d did not exit normally\n", child->pid);
+        child->success = 0;
+    } else if (WEXITSTATUS(wstatus) != 0) {
+        fprintf(stderr, "Child %d exited with code %d\n", child->pid, WEXITSTATUS(wstatus));
+        child->success = 0;
+    } else {
+        child->success = 1;
+    }
+    child->waited = 1;
+}
+
+// Function to check if a child process completed successfully
+// int quicksort_check_success(Child *child) {
+//     if (!child->valid)
+//         return 0;
+//     return child->success;
+// }
+
+static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
+    unsigned long mid = partition(arr, start, end);
+    unsigned long size_left = mid - start;
+    unsigned long size_right = end - mid - 1;
+    
+    Child left, right;
+    if (size_left > par_threshold)
+        left = quicksort_subproc(arr, start, mid, par_threshold);
+    else {
+        left.valid = 0;
+        left.success = quicksort(arr, start, mid, par_threshold);
+        left.waited = 1;
+    }
+    if (size_right > par_threshold)
+        right = quicksort_subproc(arr, mid + 1, end, par_threshold);
+    else {
+        right.valid = 0;
+        right.success = quicksort(arr, mid + 1, end, par_threshold);
+        right.waited = 1;
+    }
+    quicksort_wait(&left);
+    quicksort_wait(&right);
+    return (&left)->success && (&right)->success;
+}
