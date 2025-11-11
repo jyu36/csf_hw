@@ -197,10 +197,10 @@ int quicksort(int64_t *arr, unsigned long start, unsigned long end, unsigned lon
     if (len <= par_threshold) {
         qsort(arr + start, len, sizeof(int64_t), compare);
         return 1;
+    } else {
+        //recursive case: parallel quicksort
+        return quicksort_parallel(arr, start, end, par_threshold);
     }
-
-    // Recursive parallel sort
-    return quicksort_parallel(arr, start, end, par_threshold);
 }
 
 // TODO: define additional helper functions if needed
@@ -248,29 +248,22 @@ void quicksort_wait(Child *child) {
 //Create Child Process to do recursive sortingif size > threshold
 static int quicksort_parallel(int64_t *arr, unsigned long start, unsigned long end, unsigned long par_threshold) {
     unsigned long mid = partition(arr, start, end);
-    unsigned long size_left = mid - start;
-    unsigned long size_right = end - mid - 1;
-    //Initialize Child Structures
-    Child left, right;
-    //Left Partition
-    if (size_left > par_threshold)
-        left = quicksort_subproc(arr, start, mid, par_threshold);
-    else {
-        left.valid = 0;
-        left.success = quicksort(arr, start, mid, par_threshold);
-        left.waited = 1;
+
+    Child left = quicksort_subproc(arr, start, mid, par_threshold);
+    Child right = quicksort_subproc(arr, mid + 1, end, par_threshold);
+    
+    // Check if both children were created successfully
+    if (!left.valid || !right.valid) {
+        // Fork failed - wait for any successfully created children
+        if (left.valid) quicksort_wait(&left);
+        if (right.valid) quicksort_wait(&right);
+        return 0;
     }
-    //Right Partition
-    if (size_right > par_threshold)
-        right = quicksort_subproc(arr, mid + 1, end, par_threshold);
-    else {
-        right.valid = 0;
-        right.success = quicksort(arr, mid + 1, end, par_threshold);
-        right.waited = 1;
-    }
-    // Wait for both child processes to finish and verify success.
+    
+    // Wait for both child processes to finish and verify success
     quicksort_wait(&left);
     quicksort_wait(&right);
-    // Return 1 only if both left and right sides sorted successfully.
-    return (&left)->success && (&right)->success;
+    
+    // Return 1 only if both left and right sides sorted successfully
+    return left.success && right.success;
 }
