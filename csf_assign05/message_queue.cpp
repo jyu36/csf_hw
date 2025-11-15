@@ -4,6 +4,7 @@
 
 MessageQueue::MessageQueue() {
   // TODO: initialize the mutex and the semaphore
+  
 }
 
 MessageQueue::~MessageQueue() {
