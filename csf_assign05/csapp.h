@@ -66,7 +66,7 @@ typedef struct {
 /* $end rio_t */
 
 /* External variables */
-/* extern int h_errno; */    /* Defined by BIND for DNS errors - commented out for macOS compatibility */ 
+extern int h_errno;    /* Defined by BIND for DNS errors */ 
 extern char **environ; /* Defined by libc */
 
 /* Misc constants */
