@@ -69,11 +69,9 @@ void *worker(void *arg) {
     // Invalid login tag
     conn->send(Message(TAG_ERR, "invalid login"));
   }
-
   // Cleanup
   delete conn;
   delete info;
-
   return nullptr;
 }
 
