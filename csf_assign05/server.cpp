@@ -34,8 +34,7 @@ struct ClientInfo
 
 namespace
 {
-
-  // Helper function to validate username/room name
+  // Helper function to validate username room name
   bool is_valid_name(const std::string &name)
   {
     if (name.empty())
@@ -52,78 +51,60 @@ namespace
     return true;
   }
 
+  // Dispatch sender commands
+  void handle_sender_command(Connection *conn, Server *server, Room *&current_room, const std::string &username, const Message &msg, bool &running) {
+    if (msg.tag == TAG_JOIN) {
+      if (!is_valid_name(msg.data)) {
+        conn->send(Message(TAG_ERR, "invalid room name"));
+        return;
+      }
+      if (current_room != nullptr) {
+        current_room = nullptr;
+      }
+      current_room = server->find_or_create_room(msg.data);
+      conn->send(Message(TAG_OK, "joined room"));
+    } else if (msg.tag == TAG_SENDALL) {
+      if (current_room == nullptr) {
+        conn->send(Message(TAG_ERR, "not in a room"));
+        return;
+      }
+      current_room->broadcast_message(username, msg.data);
+      conn->send(Message(TAG_OK, "message sent"));
+    } else if (msg.tag == TAG_LEAVE) {
+      if (current_room == nullptr) {
+        conn->send(Message(TAG_ERR, "not in a room"));
+        return;
+      }
+      current_room = nullptr;
+      conn->send(Message(TAG_OK, "left room"));
+    } else if (msg.tag == TAG_QUIT) {
+      conn->send(Message(TAG_OK, "bye"));
+      running = false;
+    } else {
+      conn->send(Message(TAG_ERR, "invalid command"));
+    }
+  }
+
   // Helper function to handle sender client
   void chat_with_sender(ClientInfo *info, const std::string &username)
   {
     Connection *conn = info->conn;
     Server *server = info->server;
     Room *current_room = nullptr;
-
-    // Process sender commands
     Message msg;
-    while (true)
+    bool running = true;
+
+    while (running)
     {
       if (!conn->receive(msg))
       {
+        if (conn->get_last_result() == Connection::INVALID_MSG) {
+          conn->send(Message(TAG_ERR, "invalid message format"));
+          continue;
+        }
         break; // Connection closed
       }
-
-      if (msg.tag == TAG_JOIN)
-      {
-        // Validate room name
-        if (!is_valid_name(msg.data))
-        {
-          conn->send(Message(TAG_ERR, "invalid room name"));
-          continue;
-        }
-
-        // Leave current room if in one
-        if (current_room != nullptr)
-        {
-          current_room = nullptr;
-        }
-
-        // Join new room
-        current_room = server->find_or_create_room(msg.data);
-        conn->send(Message(TAG_OK, "joined room"));
-      }
-      else if (msg.tag == TAG_SENDALL)
-      {
-        // Check if in a room
-        if (current_room == nullptr)
-        {
-          conn->send(Message(TAG_ERR, "not in a room"));
-          continue;
-        }
-
-        // Broadcast message to all receivers in room
-        current_room->broadcast_message(username, msg.data);
-        conn->send(Message(TAG_OK, "message sent"));
-      }
-      else if (msg.tag == TAG_LEAVE)
-      {
-        // Check if in a room
-        if (current_room == nullptr)
-        {
-          conn->send(Message(TAG_ERR, "not in a room"));
-          continue;
-        }
-
-        // Leave room
-        current_room = nullptr;
-        conn->send(Message(TAG_OK, "left room"));
-      }
-      else if (msg.tag == TAG_QUIT)
-      {
-        // Send OK and exit
-        conn->send(Message(TAG_OK, "bye"));
-        break;
-      }
-      else
-      {
-        // Invalid message tag
-        conn->send(Message(TAG_ERR, "invalid command"));
-      }
+      handle_sender_command(conn, server, current_room, username, msg, running);
     }
   }
 
@@ -134,14 +115,15 @@ namespace
     Server *server = info->server;
     User *user = nullptr;
     Room *current_room = nullptr;
-
     // Create User object
     user = new User(username);
-
     // Expect JOIN message
     Message msg;
     if (!conn->receive(msg))
     {
+      if (conn->get_last_result() == Connection::INVALID_MSG) {
+        conn->send(Message(TAG_ERR, "invalid message format"));
+      }
       delete user;
       return;
     }
@@ -177,13 +159,11 @@ namespace
     while (true)
     {
       Message *delivery_msg = user->mqueue.dequeue();
-
       if (delivery_msg == nullptr)
       {
         // Timeout, check if connection still alive by trying to send
         continue;
       }
-
       // Try to send message to receiver
       if (!conn->send(*delivery_msg))
       {
@@ -191,7 +171,6 @@ namespace
         delete delivery_msg;
         break;
       }
-
       delete delivery_msg;
     }
 
@@ -203,63 +182,50 @@ namespace
     delete user;
   }
 
-  void *worker(void *arg)
-  {
-    pthread_detach(pthread_self());
-
-    // TODO: use a static cast to convert arg from a void* to
-    //       whatever pointer type describes the object(s) needed
-    //       to communicate with a client (sender or receiver)
-    ClientInfo *info = static_cast<ClientInfo *>(arg);
+  // Handle login process
+  void handle_login(ClientInfo *info, const Message &login_msg) {
     Connection *conn = info->conn;
-
-    // TODO: read login message (should be tagged either with
-    //       TAG_SLOGIN or TAG_RLOGIN), send response
-    Message login_msg;
-    if (!conn->receive(login_msg))
-    {
-      delete info;
-      delete conn;
-      return nullptr;
-    }
-
-    // TODO: depending on whether the client logged in as a sender or
-    //       receiver, communicate with the client (implementing
-    //       separate helper functions for each of these possibilities
-    //       is a good idea)
-    if (login_msg.tag == TAG_SLOGIN)
-    {
-      // Validate username
-      if (!is_valid_name(login_msg.data))
-      {
+    if (login_msg.tag == TAG_SLOGIN) {
+      if (!is_valid_name(login_msg.data)) {
         conn->send(Message(TAG_ERR, "invalid username"));
-      }
-      else
-      {
-        // Handle sender login
+      } else {
         conn->send(Message(TAG_OK, "logged in as sender"));
         chat_with_sender(info, login_msg.data);
       }
-    }
-    else if (login_msg.tag == TAG_RLOGIN)
-    {
-      // Validate username
-      if (!is_valid_name(login_msg.data))
-      {
+    } else if (login_msg.tag == TAG_RLOGIN) {
+      if (!is_valid_name(login_msg.data)) {
         conn->send(Message(TAG_ERR, "invalid username"));
-      }
-      else
-      {
-        // Handle receiver login
+      } else {
         conn->send(Message(TAG_OK, "logged in as receiver"));
         chat_with_receiver(info, login_msg.data);
       }
-    }
-    else
-    {
-      // Invalid login tag
+    } else {
       conn->send(Message(TAG_ERR, "invalid login"));
     }
+  }
+
+  void *worker(void *arg)
+  {
+    pthread_detach(pthread_self());
+    ClientInfo *info = static_cast<ClientInfo *>(arg);
+    Connection *conn = info->conn;
+
+    Message login_msg;
+    while (true) {
+      if (!conn->receive(login_msg))
+      {
+        if (conn->get_last_result() == Connection::INVALID_MSG) {
+          conn->send(Message(TAG_ERR, "invalid message format"));
+          continue;
+        }
+        delete info;
+        delete conn;
+        return nullptr;
+      }
+      break;
+    }
+
+    handle_login(info, login_msg);
 
     // Cleanup
     delete conn;
@@ -267,7 +233,6 @@ namespace
 
     return nullptr;
   }
-
 }
 
 ////////////////////////////////////////////////////////////////////////
