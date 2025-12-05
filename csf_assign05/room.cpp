@@ -31,7 +31,9 @@ void Room::broadcast_message(const std::string &sender_username, const std::stri
   // TODO: send a message to every (receiver) User in the room
   Guard guard(lock);
   for (User *user : members) {
-    Message *msg = new Message(sender_username, message_text);
+    // Format: delivery:room:sender:message_text
+    std::string delivery_data = room_name + ":" + sender_username + ":" + message_text;
+    Message *msg = new Message(TAG_DELIVERY, delivery_data);
     user->mqueue.enqueue(msg);
   }
 }

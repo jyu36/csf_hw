@@ -1,0 +1,6 @@
+/join partytime
+This is a message from alice
+each alternating line of messages...
+this test ensures that clients are served in order
+/quit
+
